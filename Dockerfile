@@ -9,5 +9,6 @@ RUN npm run build
 # Use an efficient server to host the static files
 FROM nginx:stable-alpine
 COPY --from=0 /app/dist /usr/share/nginx/html
-EXPOSE 80
+RUN sed -i 's/listen\(.*\)80;/listen 8080;/g' /etc/nginx/conf.d/default.conf
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
