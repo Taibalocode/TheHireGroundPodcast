@@ -11,8 +11,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // API_KEY will be accessed at runtime from window or process.env in the browser
+        // Only inject if it exists in development mode
+        'process.env.API_KEY': JSON.stringify(mode === 'development' ? env.GEMINI_API_KEY || '' : ''),
       },
       resolve: {
         alias: {
