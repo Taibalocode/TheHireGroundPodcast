@@ -84,24 +84,18 @@ const App: React.FC = () => {
   const performCloudSync = async () => {
     setIsLoading(true);
     setSyncStatus('syncing');
-    setSyncError(null);
-    logEvent('CLOUD_SYNC_START');
-    
     try {
-      const { videos: fetchedVideos, source } = await videoStorage.syncWithCloud();
+      // Fetch directly from Firestore
+      const fetchedVideos = await videoStorage.getAll();
       setVideos(fetchedVideos);
-      setSyncStatus(source === 'cloud' ? 'synced' : 'local');
-      logEvent('CLOUD_SYNC_SUCCESS', `Loaded ${fetchedVideos.length} videos from ${source}`);
+      setSyncStatus('synced');
     } catch (e) {
       console.error("Sync failed:", e);
-      setSyncError("Failed to load data.");
       setSyncStatus('local');
-      setVideos(videoStorage.getAll()); // Fallback
     } finally {
       setIsLoading(false);
     }
   };
-
   const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles))).sort(), [videos]);
   const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics))).sort(), [videos]);
   const allAudiences = useMemo(() => Array.from(new Set(videos.flatMap(v => v.targetAudience || []))).sort(), [videos]);
@@ -240,33 +234,27 @@ export const MASTER_SEED_DATA = {
     setIsSettingsOpen(false);
   };
 
-  const handleVideoAdd = (newVideo: Omit<VideoEntry, 'id' | 'createdAt'>) => {
-      const v: VideoEntry = {
-          ...newVideo,
-          id: crypto.randomUUID(),
-          createdAt: Date.now()
-      };
-      const updated = videoStorage.add(v);
-      setVideos(updated);
+  const handleVideoAdd = async (newVideo: Omit<VideoEntry, 'id' | 'createdAt'>) => {
+      await videoStorage.add(newVideo);
+      await performCloudSync(); // Refresh list from database
       setIsModalOpen(false);
   };
 
-  const handleVideoUpdate = (id: string, updates: Partial<VideoEntry>) => {
-      const updated = videoStorage.update(id, updates);
-      setVideos([...updated]); // Create new array ref to ensure children (TagManager) see update
+  const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
+      await videoStorage.update(id, updates);
+      await performCloudSync(); // Refresh list from database
       if (isModalOpen) {
           setIsModalOpen(false);
           setEditingVideo(null);
       }
   };
 
-  const handleVideoDelete = (id: string) => {
-      const updated = videoStorage.delete(id);
-      setVideos([...updated]);
+  const handleVideoDelete = async (id: string) => {
+      await videoStorage.delete(id);
+      await performCloudSync(); // Refresh list from database
       setIsModalOpen(false);
       setEditingVideo(null);
   };
-
   const handleResetApp = () => {
     setIsSettingsOpen(false);
     
