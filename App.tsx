@@ -262,7 +262,6 @@ export const MASTER_SEED_DATA = {
     if (window.confirm("⚠️ FACTORY RESET ⚠️\n\nThis will permanently delete all local changes and restore the master catalog from seedData.ts.\n\nAre you sure?")) {
         try {
             logEvent('ADMIN_FACTORY_RESET_START');
-            videoStorage.reset();
             // Force browser to reload without cache
             const reloadUrl = window.location.origin + window.location.pathname + '?reset=' + Date.now();
             window.location.replace(reloadUrl);
