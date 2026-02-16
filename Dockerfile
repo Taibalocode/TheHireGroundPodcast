@@ -8,9 +8,15 @@ RUN npm run build
 
 # Stage 2: Serve
 FROM --platform=linux/amd64 nginx:stable-alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-# Update the Nginx config to listen on 8080
-RUN sed -i 's/listen\(.*\)80;/listen 8080;/g' /etc/nginx/conf.d/default.conf || true
 
+# 1. Copy your custom nginx.conf FIRST
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# 2. Copy the build artifacts from Stage 1
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# 3. Expose the port Cloud Run expects
 EXPOSE 8080
+
+# 4. Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
