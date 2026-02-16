@@ -9,7 +9,7 @@ RUN npm run build
 # Stage 2: Serve
 FROM --platform=linux/amd64 nginx:stable-alpine
 
-# 1. Copy your custom nginx.conf FIRST
+# 1. Copy your custom nginx.conf 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 2. Copy the build artifacts from Stage 1
