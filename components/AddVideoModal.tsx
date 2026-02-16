@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { X, Sparkles, Loader2, Youtube, Plus, FileText, Link as LinkIcon, Save, Upload, Zap, ChevronDown, Tag, Users, Briefcase } from 'lucide-react';
 import { analyzeVideoContent, parseBulkVideoInput } from '../services/geminiService';
 import { VideoEntry } from '../types';
 import { logEvent } from '../services/logger';
-import { draftStorage } from '../services/storage';
+import { videoStorage } from '../services/storage';
 import { normalizeTags, toTitleCase } from '../utils/stringUtils';
 
 interface AddVideoModalProps {
@@ -22,7 +21,6 @@ interface AddVideoModalProps {
 type Tab = 'single' | 'bulk';
 type EditSection = 'details' | 'transcript';
 
-// --- Internal Reusable Component: MultiSelectInput ---
 const MultiSelectInput = ({ 
   label, 
   icon: Icon,
@@ -43,18 +41,16 @@ const MultiSelectInput = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Convert comma-separated string to array
   const selectedTags = useMemo(() => 
     value.split(',').map(s => s.trim()).filter(s => s.length > 0), 
   [value]);
 
-  // Filter options based on input and exclude already selected
   const filteredOptions = useMemo(() => {
     const search = inputValue.toLowerCase();
     return options.filter(opt => 
       !selectedTags.includes(opt) && 
       opt.toLowerCase().includes(search)
-    ).slice(0, 10); // Limit to top 10 matches
+    ).slice(0, 10);
   }, [options, selectedTags, inputValue]);
 
   const addTag = (tag: string) => {
@@ -80,7 +76,6 @@ const MultiSelectInput = ({
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -157,8 +152,6 @@ const MultiSelectInput = ({
   );
 };
 
-// --- Main Modal Component ---
-
 export const AddVideoModal: React.FC<AddVideoModalProps> = ({ 
   isOpen, onClose, onAdd, onUpdate, onDelete, editVideo, 
   availableProfiles, availableTopics, availableAudiences 
@@ -186,13 +179,11 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Robust helper to format any date string into YYYY-MM-DD for the HTML date input
   const formatDateForInput = (dateStr: string | undefined): string => {
     if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return '';
-      // Ensure we get the correct YYYY-MM-DD regardless of locale/timezone
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -212,51 +203,28 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
       setFullDescription(editVideo.fullDescription || '');
       setGuestName(editVideo.guestName || '');
       setGuestProfiles(editVideo.guestProfiles.join(', '));
-      // Handle array vs string fallback
       setTargetAudience(Array.isArray(editVideo.targetAudience) ? editVideo.targetAudience.join(', ') : (editVideo.targetAudience || ''));
       setTopics(editVideo.topics.join(', '));
       setTranscript(editVideo.transcript || '');
       setPublishedAt(formatDateForInput(editVideo.publishedAt));
       setIsShort(editVideo.isShort === 'Y' ? 'Y' : 'N');
     } else {
-      const draft = draftStorage.get();
-      if (draft) {
-        if (draft.activeTab) setActiveTab(draft.activeTab);
-        if (draft.url) setUrl(draft.url);
-        if (draft.spotifyUrl) setSpotifyUrl(draft.spotifyUrl);
-        if (draft.title) setTitle(draft.title);
-        if (draft.headline) setHeadline(draft.headline);
-        if (draft.fullDescription) setFullDescription(draft.fullDescription);
-        if (draft.guestProfiles) setGuestProfiles(draft.guestProfiles);
-        if (draft.topics) setTopics(draft.topics);
-        if (draft.bulkText) setBulkText(draft.bulkText);
-        if (draft.isShort) setIsShort(draft.isShort === 'Y' ? 'Y' : 'N');
-        if ((draft as any).publishedAt) setPublishedAt((draft as any).publishedAt);
-        if ((draft as any).targetAudience) setTargetAudience((draft as any).targetAudience);
-      } else {
-        setUrl('');
-        setSpotifyUrl('');
-        setTitle('');
-        setHeadline('');
-        setFullDescription('');
-        setGuestName('');
-        setGuestProfiles('');
-        setTargetAudience('');
-        setTopics('');
-        setTranscript('');
-        setIsShort('N');
-        setPublishedAt(new Date().toISOString().split('T')[0]);
-      }
+      setUrl('');
+      setSpotifyUrl('');
+      setTitle('');
+      setHeadline('');
+      setFullDescription('');
+      setGuestName('');
+      setGuestProfiles('');
+      setTargetAudience('');
+      setTopics('');
+      setTranscript('');
+      setIsShort('N');
+      setPublishedAt(new Date().toISOString().split('T')[0]);
     }
     setError(null);
     setSuccessMsg(null);
   }, [editVideo, isOpen]);
-
-  const saveDraft = useCallback((updates: Record<string, any>) => {
-    if (!editVideo) {
-      draftStorage.save(updates);
-    }
-  }, [editVideo]);
 
   if (!isOpen) return null;
 
@@ -272,12 +240,11 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
   const isValidSpotifyUrl = (url: string | undefined | null) => {
       if (!url || typeof url !== 'string') return false;
       const trimmed = url.trim();
-      return trimmed.includes('spotify.com') || trimmed.includes('open.spotify.com');
+      return trimmed.includes('spotify.com');
   };
 
   const handleTabChange = (tab: Tab) => {
       setActiveTab(tab);
-      if (!editVideo) saveDraft({ activeTab: tab });
       setError(null);
       setSuccessMsg(null);
   };
@@ -297,24 +264,12 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
       setGuestProfiles(result.guestProfiles.join(', '));
       setTopics(result.topics.join(', '));
       if (result.guestName) setGuestName(result.guestName);
-      // New: handle targetAudience array
       if (result.targetAudience) setTargetAudience(result.targetAudience.join(', '));
       if (result.headline) setHeadline(result.headline);
       if (result.fullDescription) setFullDescription(result.fullDescription);
       
       const shortStatus = result.isShort === 'Y' ? 'Y' : 'N';
       setIsShort(shortStatus);
-      
-      if (!editVideo) {
-        saveDraft({ 
-          guestProfiles: result.guestProfiles.join(', '), 
-          topics: result.topics.join(', '),
-          targetAudience: result.targetAudience.join(', '),
-          headline: result.headline,
-          fullDescription: result.fullDescription,
-          isShort: shortStatus
-        });
-      }
 
       logEvent('ANALYZE_SUCCESS', 'Successfully analyzed metadata');
     } catch (err: any) {
@@ -357,7 +312,6 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
     } else {
       logEvent('VIDEO_ADD', `Adding video: ${title}`);
       onAdd(videoData);
-      draftStorage.clear();
     }
     
     resetAndClose();
@@ -395,7 +349,6 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
         if (validVideos.length > 0) {
             validVideos.forEach(v => onAdd(v));
             setSuccessMsg(`Successfully imported ${validVideos.length} videos.`);
-            draftStorage.clear();
             if (failedItems.length === 0) {
                  setTimeout(resetAndClose, 1500);
             }
@@ -515,8 +468,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
             publishedAt: getVal(dateIdx) || new Date().toISOString().split('T')[0],
             guestProfiles: normalizeTags(getVal(profilesIdx).split(',').map(s => s.trim()).filter(s => s)),
             topics: normalizeTags(getVal(topicsIdx).split(',').map(s => s.trim()).filter(s => s)),
-            // targetAudience: toTitleCase(getVal(audienceIdx)), // OLD
-            targetAudience: normalizeTags(getVal(audienceIdx).split(',').map(s => s.trim()).filter(s => s)), // NEW
+            targetAudience: normalizeTags(getVal(audienceIdx).split(',').map(s => s.trim()).filter(s => s)),
             transcript: getVal(transcriptIdx),
             spotifyUrl: spotifyUrl,
             isShort: getVal(shortsIdx).toUpperCase() === 'Y' ? 'Y' : 'N'
@@ -532,7 +484,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
         setSuccessMsg(`Imported ${addedCount} videos.`);
         setTimeout(onClose, 2000);
       } else {
-        setError("No valid videos found in CSV. Check headers and required fields.");
+        setError("No valid videos found in CSV.");
       }
     } catch (err) {
       setError("Failed to parse CSV file.");
@@ -590,15 +542,15 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">YouTube Link</label>
-                          <input type="text" disabled={isEditMode && !!editVideo.youtubeId} placeholder="https://www.youtube.com/watch?v=..." value={url} onChange={(e) => { setUrl(e.target.value); saveDraft({ url: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                          <input type="text" disabled={isEditMode && !!editVideo.youtubeId} placeholder="https://www.youtube.com/watch?v=..." value={url} onChange={(e) => setUrl(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
                       </div>
                       <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Spotify Link</label>
-                          <input type="text" placeholder="https://open.spotify.com/episode/..." value={spotifyUrl} onChange={(e) => { setSpotifyUrl(e.target.value); saveDraft({ spotifyUrl: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                          <input type="text" placeholder="https://open.spotify.com/episode/..." value={spotifyUrl} onChange={(e) => setSpotifyUrl(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
                       <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Episode Title</label>
-                          <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveDraft({ title: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" required />
+                          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" required />
                       </div>
                     </div>
 
@@ -607,11 +559,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                             <input 
                               type="checkbox" 
                               checked={isShort === 'Y'} 
-                              onChange={(e) => {
-                                const val = e.target.checked ? 'Y' : 'N';
-                                setIsShort(val);
-                                saveDraft({ isShort: val });
-                              }}
+                              onChange={(e) => setIsShort(e.target.checked ? 'Y' : 'N')}
                               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                             />
                             <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
@@ -630,15 +578,15 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                          <div className="space-y-4">
                            <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Headline (Short Description)</label>
-                              <input type="text" value={headline} onChange={(e) => { setHeadline(e.target.value); saveDraft({ headline: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Short 1-2 sentence summary..." />
+                              <input type="text" value={headline} onChange={(e) => setHeadline(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Short 1-2 sentence summary..." />
                            </div>
                            <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Full Description</label>
-                              <textarea value={fullDescription} onChange={(e) => { setFullDescription(e.target.value); saveDraft({ fullDescription: e.target.value }); }} rows={6} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Detailed description..." />
+                              <textarea value={fullDescription} onChange={(e) => setFullDescription(e.target.value)} rows={6} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Detailed description..." />
                            </div>
                          </div>
                        ) : (
-                         <textarea value={transcript} onChange={(e) => { setTranscript(e.target.value); saveDraft({ transcript: e.target.value }); }} rows={8} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-xs" placeholder="Paste transcript here..." />
+                         <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={8} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-xs" placeholder="Paste transcript here..." />
                        )}
                     </div>
 
@@ -652,21 +600,20 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Guest Name</label>
-                            <input type="text" placeholder="e.g. Jane Doe" value={guestName} onChange={(e) => { setGuestName(e.target.value); saveDraft({ guestName: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <input type="text" placeholder="e.g. Jane Doe" value={guestName} onChange={(e) => setGuestName(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </div>
                          <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Published Date</label>
-                            <input type="date" value={publishedAt} onChange={(e) => { setPublishedAt(e.target.value); saveDraft({ publishedAt: e.target.value }); }} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                            <input type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </div>
                         
-                        {/* Multi-Select Inputs */}
                         <div className="relative">
                             <MultiSelectInput 
                               label="Job Profiles"
                               icon={Briefcase}
                               value={guestProfiles} 
                               options={availableProfiles}
-                              onChange={(val) => { setGuestProfiles(val); saveDraft({ guestProfiles: val }); }}
+                              onChange={(val) => setGuestProfiles(val)}
                               placeholder="e.g. Salesperson, CEO"
                             />
                         </div>
@@ -676,7 +623,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                               icon={Users}
                               value={targetAudience} 
                               options={availableAudiences}
-                              onChange={(val) => { setTargetAudience(val); saveDraft({ targetAudience: val }); }}
+                              onChange={(val) => setTargetAudience(val)}
                               placeholder="e.g. Entry Level, Candidates"
                             />
                         </div>
@@ -686,7 +633,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                               icon={Tag}
                               value={topics} 
                               options={availableTopics}
-                              onChange={(val) => { setTopics(val); saveDraft({ topics: val }); }}
+                              onChange={(val) => setTopics(val)}
                               placeholder="e.g. Interviewing, Salary"
                             />
                         </div>
@@ -709,7 +656,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                         <div className="flex-grow border-t border-gray-200"></div>
                     </div>
                     <div className="space-y-2">
-                        <textarea placeholder="Paste list here..." value={bulkText} onChange={(e) => { setBulkText(e.target.value); saveDraft({ bulkText: e.target.value }); }} rows={8} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" />
+                        <textarea placeholder="Paste list here..." value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={8} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" />
                     </div>
                 </div>
             )}
