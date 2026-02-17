@@ -170,9 +170,6 @@ const App: React.FC = () => {
                         
                         {isSettingsOpen && (
                             <div className="absolute right-0 mt-2 w-56 bg-white border rounded-xl shadow-xl z-50 p-2">
-                                <button onClick={handleMigrateFromSeed} className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-2">
-                                    <ArrowUpCircle size={14} /> Migrate Seed to Cloud
-                                </button>
                                 <button onClick={() => setIsAdminMode(false)} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
                                     Exit Admin
                                 </button>
