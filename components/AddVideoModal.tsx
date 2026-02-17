@@ -291,20 +291,24 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
       return;
     }
 
-    const videoData: Omit<VideoEntry, 'id' | 'createdAt'> = {
-      youtubeId: youtubeId || "",
-      title,
-      headline,
-      fullDescription,
-      guestName,
-      guestProfiles: normalizeTags(guestProfiles.split(',').map(s => s.trim()).filter(s => s)),
-      targetAudience: normalizeTags(targetAudience.split(',').map(s => s.trim()).filter(s => s)),
-      topics: normalizeTags(topics.split(',').map(s => s.trim()).filter(s => s)),
-      transcript,
-      publishedAt,
-      isShort: isShort,
-      spotifyUrl: validSpotify ? spotifyUrl.trim() : undefined
+    const videoData: any = {
+    youtubeId: youtubeId || "",
+    title,
+    headline,
+    fullDescription,
+    guestName,
+    guestProfiles: normalizeTags(guestProfiles.split(',').map(s => s.trim()).filter(s => s)),
+    targetAudience: normalizeTags(targetAudience.split(',').map(s => s.trim()).filter(s => s)),
+    topics: normalizeTags(topics.split(',').map(s => s.trim()).filter(s => s)),
+    transcript,
+    publishedAt,
+    isShort: isShort,
     };
+
+// Only add spotifyUrl if it actually exists
+if (validSpotify && spotifyUrl.trim()) {
+  videoData.spotifyUrl = spotifyUrl.trim();
+}
 
     if (editVideo) {
       logEvent('VIDEO_UPDATE', `Updating video: ${editVideo.id}`);
