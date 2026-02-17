@@ -669,9 +669,12 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
             <div className="flex gap-3">
               <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-lg text-gray-600 hover:bg-gray-200 font-medium transition-colors">Cancel</button>
               {activeTab === 'single' ? (
-                  <button type="submit" form="video-form" className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition-colors">
-                      {isEditMode ? <Save size={18} /> : <Plus size={18} />}
-                      {isEditMode ? 'Save Changes' : 'Add Video'}
+                  <button 
+                   type="submit" 
+                   form="video-form" // 👈 Ensure this matches <form id="video-form" ...>
+                   className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg..."
+                  >
+                  {isEditMode ? 'Save Changes' : 'Add Video'}
                   </button>
               ) : (
                   <button type="button" onClick={handleBulkSubmit} disabled={isAnalyzing || !bulkText} className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition-colors disabled:opacity-50">
