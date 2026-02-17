@@ -75,25 +75,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleMigrateFromSeed = async () => {
-    if (!window.confirm("This will upload all videos from your local seed file to Firestore. Continue?")) return;
-    
-    setIsLoading(true);
-    try {
-      for (const video of MASTER_SEED_DATA.videos) {
-        const { id, createdAt, ...cleanVideo } = video as any; 
-        await videoStorage.add(cleanVideo);
-      }
-      alert("Migration Successful!");
-      await performCloudSync();
-    } catch (err) {
-      alert("Migration Failed. Check console.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleVideoAdd = async (newVideo: Omit<VideoEntry, 'id' | 'createdAt'>) => {
     try {
       await videoStorage.add(newVideo);
