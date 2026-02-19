@@ -7,9 +7,9 @@ import { videoStorage } from './services/storage';
 import { Lock, Plus, X, List, LayoutGrid, Grid } from 'lucide-react';
 
 const ADMIN_PASSWORD = "Ta1Bal0gun!";
-
 const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list'); // Default view
   const [videos, setVideos] = useState<VideoEntry[]>([]);
@@ -58,29 +58,26 @@ const App: React.FC = () => {
   const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics))).sort(), [videos]);
 
   const filteredVideos = useMemo(() => {
-  return videos.filter(video => {
-    // 1. Filter by Search Query
-    const matchesSearch = !filterState.searchQuery || 
-      video.title.toLowerCase().includes(filterState.searchQuery.toLowerCase()) ||
-      video.guestName.toLowerCase().includes(filterState.searchQuery.toLowerCase());
+    return videos.filter(video => {
+      // Search check
+      const matchesSearch = !filterState.searchQuery || 
+        video.title.toLowerCase().includes(filterState.searchQuery.toLowerCase());
 
-    // 2. Filter by Guest Profiles (Match ALL selected)
-    const matchesProfiles = filterState.selectedProfiles.length === 0 || 
-      filterState.selectedProfiles.every(p => video.guestProfiles.includes(p));
+      // Profile check (Matches ALL selected profiles)
+      const matchesProfiles = filterState.selectedProfiles.length === 0 || 
+        filterState.selectedProfiles.every(p => video.guestProfiles?.includes(p));
 
-    // 3. Filter by Topics (Match ALL selected)
-    const matchesTopics = filterState.selectedTopics.length === 0 || 
-      filterState.selectedTopics.every(t => video.topics.includes(t));
+      // Topic check (Matches ALL selected topics)
+      const matchesTopics = filterState.selectedTopics.length === 0 || 
+        filterState.selectedTopics.every(t => video.topics?.includes(t));
 
-    // 4. Filter by Shorts (SIMPLIFIED)
-    // If 'all', we don't care about the 'isShort' status (always true).
-    // If 'shorts', we only show videos where 'isShort' is 'Y'.
-    const matchesShorts = filterState.shortsFilter === 'all' || 
-                         (filterState.shortsFilter === 'shorts' && video.isShort === 'Y');
+      // Shorts toggle check
+      const matchesShorts = filterState.shortsFilter === 'all' || 
+        (filterState.shortsFilter === 'shorts' && video.isShort === 'Y');
 
-    return matchesSearch && matchesProfiles && matchesTopics && matchesShorts;
-  });
-}, [videos, filterState]);
+      return matchesSearch && matchesProfiles && matchesTopics && matchesShorts;
+    });
+  }, [videos, filterState]);
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
@@ -90,12 +87,11 @@ const App: React.FC = () => {
         filterState={filterState}
         setFilterState={setFilterState}
         availableProfiles={allProfiles}
-        availableTopics={allTopics} isOpenMobile={false} closeMobile={function (): void {
-          throw new Error('Function not implemented.');
-        } }      />
+        availableTopics={allTopics} isOpenMobile={isMobileMenuOpen} closeMobile={() => setIsMobileMenuOpen(false)}    />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 z-30">
+
           <h1 className="font-bold text-xl">The Hire Ground Podcast</h1>
           
           <div className="flex items-center gap-4">
@@ -135,8 +131,17 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
           <div className="max-w-7xl mx-auto">
+            {/* Real-time Counter */}
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-sm text-gray-500 font-medium">
+               Showing <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes
+              </p>
+            </div>
             <div className={`grid gap-4 ${viewMode === 'list' ? 'grid-cols-1' : viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}>
-              {filteredVideos.map(video => (
+              {/* ... your map function ... */}
+            </div>
+          </div>
+                {filteredVideos.map(video => (
                 <VideoCard 
                     key={video.id} 
                     video={video} 
@@ -145,8 +150,6 @@ const App: React.FC = () => {
                     onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
                 />
               ))}
-            </div>
-          </div>
         </main>
       </div>
 
