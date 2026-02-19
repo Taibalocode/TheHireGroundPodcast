@@ -72,15 +72,15 @@ const App: React.FC = () => {
     const matchesTopics = filterState.selectedTopics.length === 0 || 
       filterState.selectedTopics.every(t => video.topics.includes(t));
 
-    // 4. Filter by Shorts
+    // 4. Filter by Shorts (SIMPLIFIED)
+    // If 'all', we don't care about the 'isShort' status (always true).
+    // If 'shorts', we only show videos where 'isShort' is 'Y'.
     const matchesShorts = filterState.shortsFilter === 'all' || 
-      (filterState.shortsFilter === 'shorts' && video.isShort === 'Y') ||
-      (filterState.shortsFilter === 'long' && video.isShort !== 'Y');
+                         (filterState.shortsFilter === 'shorts' && video.isShort === 'Y');
 
     return matchesSearch && matchesProfiles && matchesTopics && matchesShorts;
   });
 }, [videos, filterState]);
-
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
