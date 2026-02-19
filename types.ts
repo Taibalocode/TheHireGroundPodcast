@@ -22,9 +22,9 @@ export interface FilterState {
   selectedProfiles: string[];
   selectedTopics: string[];
   aiSearchActive: boolean;
-  shortsFilter: 'all' | 'shorts' | 'videos'; // Filter for content format
+  // Update this line to allow the 'long' value
+  shortsFilter: 'all' | 'shorts' | 'long'; 
 }
-
 export interface AnalysisResult {
   guestName?: string;
   guestProfiles: string[];
