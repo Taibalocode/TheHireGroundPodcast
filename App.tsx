@@ -9,7 +9,6 @@ const ADMIN_PASSWORD = "Ta1Bal0gun!";
 
 const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [videos, setVideos] = useState<VideoEntry[]>([]);
@@ -72,27 +71,21 @@ const App: React.FC = () => {
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-  <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
-    {/* 1. SIDEBAR WRAPPER: Fixes the 'unclickable' issue by shrinking to w-0 when closed */}
-    <div 
-      className={`z-40 transition-all duration-300 
-        ${isMobileMenuOpen ? 'w-full fixed inset-0 bg-black/20' : 'w-0 lg:w-72'} 
-        ${!isMobileMenuOpen ? 'pointer-events-none lg:pointer-events-auto' : 'pointer-events-auto'}`}
-    >
+  <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
+    {/* 1. PERMANENT SIDEBAR: No longer fixed or floating */}
+    <div className="w-72 h-full border-r border-gray-200 bg-white shrink-0">
       <FilterSidebar 
         videos={videos}
         filterState={filterState}
         setFilterState={setFilterState}
         availableProfiles={allProfiles}
         availableTopics={allTopics} 
-        isOpenMobile={isMobileMenuOpen} 
-        closeMobile={() => setIsMobileMenuOpen(false)} 
       />
     </div>
 
-    {/* 2. MAIN CONTENT WRAPPER */}
-    <div className="flex-1 flex flex-col h-full min-w-0 relative">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 z-30 relative">
+    {/* 2. MAIN CONTENT: Fills the remaining space */}
+    <div className="flex-1 flex flex-col h-full min-w-0">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <h1 className="font-bold text-xl">The Hire Ground Podcast</h1>
         
         <div className="flex items-center gap-4">
@@ -115,14 +108,14 @@ const App: React.FC = () => {
           {isAdminMode ? (
             <button 
               onClick={() => setIsModalOpen(true)} 
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
             >
               <Plus size={18} /> Add Video
             </button>
           ) : (
             <button 
               onClick={() => setShowPasswordModal(true)} 
-              className="text-gray-400 flex items-center gap-2 hover:text-gray-600 transition-colors cursor-pointer"
+              className="text-gray-400 flex items-center gap-2 hover:text-gray-600 cursor-pointer"
             >
               <Lock size={18} /> Login
             </button>
@@ -130,17 +123,14 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* 3. SCROLLABLE VIDEO GRID */}
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 relative z-10">
+      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
-          {/* Results Counter */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6">
              <p className="text-sm text-gray-500 font-medium">
                Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes
              </p>
           </div>
 
-          {/* Video Grid */}
           <div className={`grid gap-4 ${
             viewMode === 'list' ? 'grid-cols-1' : 
             viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 
@@ -159,8 +149,6 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
-
-    {/* Modals & Overlays should be rendered here */}
   </div>
 );
 };
