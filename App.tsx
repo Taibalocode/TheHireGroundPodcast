@@ -72,7 +72,13 @@ const App: React.FC = () => {
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
+  <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
+    {/* 1. SIDEBAR WRAPPER: Fixes the 'unclickable' issue by shrinking to w-0 when closed */}
+    <div 
+      className={`z-40 transition-all duration-300 
+        ${isMobileMenuOpen ? 'w-full fixed inset-0 bg-black/20' : 'w-0 lg:w-72'} 
+        ${!isMobileMenuOpen ? 'pointer-events-none lg:pointer-events-auto' : 'pointer-events-auto'}`}
+    >
       <FilterSidebar 
         videos={videos}
         filterState={filterState}
@@ -82,54 +88,81 @@ const App: React.FC = () => {
         isOpenMobile={isMobileMenuOpen} 
         closeMobile={() => setIsMobileMenuOpen(false)} 
       />
-
-      <div className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 z-30">
-          <h1 className="font-bold text-xl">The Hire Ground Podcast</h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
-              {(['list', 'grid', 'expanded'] as ViewMode[]).map((mode) => (
-                <button 
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
-                >
-                  {mode === 'list' && <List size={18} />}
-                  {mode === 'grid' && <LayoutGrid size={18} />}
-                  {mode === 'expanded' && <Grid size={18} />}
-                </button>
-              ))}
-            </div>
-            {isAdminMode ? (
-              <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex gap-2"><Plus size={18} /> Add</button>
-            ) : (
-              <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 flex gap-2"><Lock size={18} /> Login</button>
-            )}
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-6">
-               <p className="text-sm text-gray-500 font-medium">Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes</p>
-            </div>
-            {/* FIXED: Grid classes and map are now properly contained */}
-            <div className={`grid gap-4 ${viewMode === 'list' ? 'grid-cols-1' : viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}>
-              {filteredVideos.map(video => (
-                <VideoCard 
-                    key={video.id} 
-                    video={video} 
-                    isAdmin={isAdminMode} 
-                    viewMode={viewMode}
-                    onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
-                />
-              ))}
-            </div>
-          </div>
-        </main>
-      </div>
     </div>
-  );
+
+    {/* 2. MAIN CONTENT WRAPPER */}
+    <div className="flex-1 flex flex-col h-full min-w-0 relative">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 z-30 relative">
+        <h1 className="font-bold text-xl">The Hire Ground Podcast</h1>
+        
+        <div className="flex items-center gap-4">
+          {/* Layout Toggles */}
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+            {(['list', 'grid', 'expanded'] as ViewMode[]).map((mode) => (
+              <button 
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`p-1.5 rounded-md transition-all ${viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                {mode === 'list' && <List size={18} />}
+                {mode === 'grid' && <LayoutGrid size={18} />}
+                {mode === 'expanded' && <Grid size={18} />}
+              </button>
+            ))}
+          </div>
+
+          {/* Admin Actions */}
+          {isAdminMode ? (
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={18} /> Add Video
+            </button>
+          ) : (
+            <button 
+              onClick={() => setShowPasswordModal(true)} 
+              className="text-gray-400 flex items-center gap-2 hover:text-gray-600 transition-colors cursor-pointer"
+            >
+              <Lock size={18} /> Login
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* 3. SCROLLABLE VIDEO GRID */}
+      <main className="flex-1 overflow-y-auto p-6 bg-gray-50 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          {/* Results Counter */}
+          <div className="mb-6 flex items-center justify-between">
+             <p className="text-sm text-gray-500 font-medium">
+               Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes
+             </p>
+          </div>
+
+          {/* Video Grid */}
+          <div className={`grid gap-4 ${
+            viewMode === 'list' ? 'grid-cols-1' : 
+            viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 
+            'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+          }`}>
+            {filteredVideos.map(video => (
+              <VideoCard 
+                key={video.id} 
+                video={video} 
+                isAdmin={isAdminMode} 
+                viewMode={viewMode}
+                onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
+              />
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+
+    {/* Modals & Overlays should be rendered here */}
+  </div>
+);
 };
 
 export default App;
