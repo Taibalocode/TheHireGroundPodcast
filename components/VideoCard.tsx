@@ -16,43 +16,58 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, viewMode, 
 
   // Logic for Expanded View
   if (viewMode === 'expanded') {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all flex flex-col h-full">
-        <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="block relative group">
-          <img src={`https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`} className="w-full aspect-video object-cover transition-transform group-hover:scale-105" />
-          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors" />
-        </a>
-        <div className="p-6 flex flex-col flex-1">
-          <span className="text-blue-600 text-xs font-bold uppercase mb-1">Guest: {video.guestName}</span>
-          <h3 className="font-bold text-xl mb-3 leading-tight">
-            <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">{video.title}</a>
-          </h3>
-          <p className="text-gray-500 text-sm line-clamp-3 mb-4">{video.headline}</p>
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all flex flex-col h-full group">
+      <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="block relative overflow-hidden">
+        <img 
+          src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`} 
+          className="w-full aspect-video object-cover transition-transform duration-300 group-hover:scale-105" 
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+      </a>
+      
+      {/* Reduced padding from p-6 to p-3 to fit the high-density grid */}
+      <div className="p-3 flex flex-col flex-1">
+        <span className="text-blue-600 text-[9px] font-bold uppercase mb-0.5 truncate">
+          Guest: {video.guestName}
+        </span>
+        
+        {/* Adjusted text sizes for "zoomed out" feel */}
+        <h3 className="font-bold text-xs mb-1.5 leading-tight line-clamp-2 min-h-[2rem]">
+          <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+            {video.title}
+          </a>
+        </h3>
+        
+        {/* Hidden on very small screens, line-clamp for density */}
+        <p className="text-gray-500 text-[10px] line-clamp-2 mb-3 hidden sm:block">
+          {video.headline}
+        </p>
+        
+        <div className="space-y-2 mt-auto">
+          <div className="flex flex-wrap gap-1">
+            {video.guestProfiles.slice(0, 2).map(p => (
+              <span key={p} className="bg-blue-50 text-blue-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold">
+                {p}
+              </span>
+            ))}
+          </div>
           
-          <div className="space-y-3 mt-auto">
-             <div className="flex flex-wrap gap-2">
-                <Briefcase size={14} className="text-gray-400" />
-                {video.guestProfiles.map(p => <span key={p} className="bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">{p}</span>)}
-             </div>
-             <div className="flex flex-wrap gap-2">
-                <Tag size={14} className="text-gray-400" />
-                {video.topics.slice(0, 3).map(t => <span key={t} className="bg-green-50 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold">{t}</span>)}
-             </div>
-             <div className="flex gap-4 pt-2 border-t border-gray-50">
-                <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700">
-                  <Youtube size={14} /> YouTube
-                </a>
-                {video.spotifyUrl && (
-                  <a href={video.spotifyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700">
-                    <Music size={14} /> Spotify
-                  </a>
-                )}
-             </div>
+          <div className="flex gap-3 pt-2 border-t border-gray-50">
+            <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[9px] font-bold text-red-600 hover:text-red-700">
+              <Youtube size={12} /> YouTube
+            </a>
+            {video.spotifyUrl && (
+              <a href={video.spotifyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[9px] font-bold text-green-600 hover:text-green-700">
+                <Music size={12} /> Spotify
+              </a>
+            )}
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // Logic for Compact Grid
   if (viewMode === 'grid') {

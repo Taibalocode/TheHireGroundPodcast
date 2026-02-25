@@ -148,7 +148,7 @@ const App: React.FC = () => {
             <div className={`grid gap-4 ${
               viewMode === 'list' ? 'grid-cols-1' : 
               viewMode === 'grid' ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' : 
-              'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+              'grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6'
             }`}>
               {filteredVideos.map(video => (
                 <VideoCard 
