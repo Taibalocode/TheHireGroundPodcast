@@ -64,13 +64,17 @@ const App: React.FC = () => {
     if (!aiQuery.trim()) return;
 
     setIsAiSearching(true);
-    setFilterState(prev => ({ ...prev, aiSearchActive: true }));
-
+    
     try {
+        // Attempt the AI Search
         const ids = await searchVideosWithAI(aiQuery, videos);
         setAiResultIds(ids);
+        setFilterState(prev => ({ ...prev, aiSearchActive: true }));
     } catch (err) {
-        console.error("AI Search failed:", err);
+        console.error("AI Search failed, falling back to text search:", err);
+        // Fallback: If AI fails, turn off AI mode so the local text search takes over
+        setAiResultIds(null);
+        setFilterState(prev => ({ ...prev, aiSearchActive: false }));
     } finally {
         setIsAiSearching(false);
     }
@@ -79,9 +83,8 @@ const App: React.FC = () => {
   const clearAiSearch = () => {
     setAiQuery('');
     setAiResultIds(null);
-    setFilterState(prev => ({ ...prev, aiSearchActive: false }));
+    setFilterState(prev => ({ ...prev, aiSearchActive: false, searchQuery: '' }));
   };
-
   const filteredVideos = useMemo(() => {
   // 1. Start with all videos
   let result = videos;
@@ -205,12 +208,18 @@ const App: React.FC = () => {
             {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={18} /> : <Sparkles className={`transition-colors ${aiResultIds ? "text-blue-600" : "text-gray-400 group-hover:text-blue-400"}`} size={18} />}
         </div>
         <input 
-            type="text" 
-            value={aiQuery}
-            onChange={(e) => setAiQuery(e.target.value)}
-            placeholder="Ask AI about episodes..."
-            className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
-        />
+    type="text" 
+    value={aiQuery}
+    onChange={(e) => {
+        const val = e.target.value;
+        setAiQuery(val);
+        // Instantly run standard text search as the user types
+        setFilterState(prev => ({ ...prev, searchQuery: val, aiSearchActive: false }));
+        setAiResultIds(null); // Clear previous AI results when they type something new
+    }}
+    placeholder="Ask AI about episodes..."
+    className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
+/>
         {aiResultIds && (
             <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center bg-gray-50 transition-colors">
                 <X size={16} />
