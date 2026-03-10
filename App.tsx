@@ -5,14 +5,13 @@ import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
 import { AddVideoModal } from './components/AddVideoModal';
 import { logEvent } from './services/logger';
-import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags } from 'lucide-react';
+import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud } from 'lucide-react';
 import { searchVideosWithAI } from './services/geminiService';
 import { Documentation } from './components/Documentation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { TagManager } from './components/TagManager';
 
 const ADMIN_PASSWORD = "Ta1Bal0gun!";
-
 const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +25,7 @@ const App: React.FC = () => {
     aiSearchActive: false,
     shortsFilter: 'all'
   });
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoEntry | null>(null);
@@ -251,22 +251,49 @@ const App: React.FC = () => {
      )}
      
      {/* Admin Controls */}
-     {isAdminMode ? (
-        <div className="flex items-center gap-1 md:gap-2">
-          {/* Admin Tabs - visible on larger screens */}
-          <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
-          <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
-          <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
-          
-          <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95">
-            <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
-          </button>
+{isAdminMode ? (
+  <div className="flex items-center gap-1 md:gap-2 relative">
+    {/* Dashboard Tabs */}
+    <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
+    <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
+    <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
+    
+    <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95">
+      <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
+    </button>
+
+    {/* NEW: Settings Menu Toggle */}
+    <button 
+      onClick={() => setShowSettingsMenu(!showSettingsMenu)} 
+      className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors ml-1"
+    >
+      <Settings size={20} />
+    </button>
+
+    {/* NEW: Settings Dropdown Box */}
+    {showSettingsMenu && (
+      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+        <div className="px-4 py-2 border-b border-gray-50 mb-1">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Data Management</p>
         </div>
-     ) : (
-        <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
-          <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
+        <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors">
+          <Download size={16} /> Export to CSV
         </button>
-     )}
+        <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors">
+          <FileJson size={16} /> JSON Backup
+        </button>
+        <div className="border-t border-gray-50 my-1"></div>
+        <button className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium">
+          <UploadCloud size={16} /> Publish seedData.ts
+        </button>
+      </div>
+    )}
+  </div>
+) : (
+  <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
+    <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
+  </button>
+)}
   </div>
 </header>
 
