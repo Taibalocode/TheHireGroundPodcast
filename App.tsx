@@ -5,7 +5,7 @@ import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
 import { AddVideoModal } from './components/AddVideoModal';
 import { logEvent } from './services/logger';
-import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud } from 'lucide-react';
+import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud, RefreshCcw, FileSpreadsheet } from 'lucide-react';
 import { searchVideosWithAI } from './services/geminiService';
 import { Documentation } from './components/Documentation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -198,7 +198,7 @@ const App: React.FC = () => {
     <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden shrink-0">
       <Menu size={20} />
     </button>
-    <h1 className="font-bold text-base md:text-xl truncate hidden sm:block text-gray-900">The Hire Ground</h1>
+    <h1 className="font-bold text-base md:text-xl truncate hidden sm:block text-gray-900">The Hire Ground Podcast</h1>
   </div>
 
   {/* 2. CENTER: AI Search Bar */}
@@ -272,22 +272,40 @@ const App: React.FC = () => {
 
     {/* NEW: Settings Dropdown Box */}
     {showSettingsMenu && (
-      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-        <div className="px-4 py-2 border-b border-gray-50 mb-1">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Data Management</p>
-        </div>
-        <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors">
-          <Download size={16} /> Export to CSV
-        </button>
-        <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors">
-          <FileJson size={16} /> JSON Backup
-        </button>
-        <div className="border-t border-gray-50 my-1"></div>
-        <button className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium">
-          <UploadCloud size={16} /> Publish seedData.ts
-        </button>
-      </div>
-    )}
+  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+    
+    {/* Data Management Section */}
+    <div className="px-4 py-2 border-b border-gray-50 mb-1">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Data Management</p>
+    </div>
+    
+    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+      <FileSpreadsheet size={16} className="text-gray-400" /> Export to CSV
+    </button>
+    
+    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+      <FileJson size={16} className="text-gray-400" /> JSON Backup
+    </button>
+    
+    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+      <BarChart3 size={16} className="text-gray-400" /> Export Activity Logs
+    </button>
+    
+    {/* System Actions Section */}
+    <div className="px-4 py-2 border-b border-gray-50 mb-1 mt-2">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">System Actions</p>
+    </div>
+    
+    <button className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-3 transition-colors font-medium">
+      <UploadCloud size={16} /> Publish seedData.ts
+    </button>
+    
+    <button className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors font-medium">
+      <RefreshCcw size={16} /> Factory Reset
+    </button>
+    
+  </div>
+)}
   </div>
 ) : (
   <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
