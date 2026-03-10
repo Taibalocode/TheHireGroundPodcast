@@ -3,8 +3,9 @@ import { VideoEntry, FilterState } from './types';
 import { FilterSidebar } from './components/FilterSidebar';
 import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
-import { Lock, Plus, List, LayoutGrid, Grid, Menu } from 'lucide-react';
+import { Lock, Plus, List, LayoutGrid, Grid, Menu, Sparkles } from 'lucide-react';
 import { AddVideoModal } from './components/AddVideoModal';
+import { logEvent } from './services/logger';
 
 const ADMIN_PASSWORD = "Ta1Bal0gun!";
 
@@ -71,7 +72,23 @@ const App: React.FC = () => {
   }, [videos, filterState]);
 
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  const handleAISearch = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault();
+  
+  if (!filterState.searchQuery.trim()) return;
 
+  setIsLoading(true); // Show a loading state while AI thinks
+  try {
+    // This calls your existing Gemini service to find semantic matches
+    const aiResults = await videoStorage.searchWithAI(filterState.searchQuery);
+    setVideos(aiResults);
+    logEvent('AI_SEARCH_SUCCESS', `Query: ${filterState.searchQuery}`);
+  } catch (err) {
+    console.error("AI Search failed, falling back to local filter", err);
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
   <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
     
@@ -104,54 +121,54 @@ const App: React.FC = () => {
     <div className="flex-1 flex flex-col min-w-0 h-full relative z-10">
       
       {/* HEADER: Updated with min-w-0 and adjusted spacing for mobile density */}
-      <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 flex items-center justify-between shrink-0 relative z-30">
-        <div className="flex items-center gap-2 min-w-0">
-          <button 
-            onClick={() => setIsMobileMenuOpen(true)} 
-            className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden shrink-0"
-          >
-            <Menu size={20} />
-          </button>
-          <h1 className="font-bold text-base md:text-xl truncate">The Hire Ground</h1>
-        </div>
-        
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
-          {/* Layout Toggles: Visible on all screens now */}
-          <div className="flex items-center bg-gray-100 p-0.5 md:p-1 rounded-lg border border-gray-200">
-            {(['list', 'grid', 'expanded'] as ViewMode[]).map((mode) => (
-              <button 
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`p-1 md:p-1.5 rounded-md transition-all ${
-                  viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'
-                }`}
-              >
-                {mode === 'list' && <List size={16} className="md:w-[18px]" />}
-                {mode === 'grid' && <LayoutGrid size={16} className="md:w-[18px]" />}
-                {mode === 'expanded' && <Grid size={16} className="md:w-[18px]" />}
-              </button>
-            ))}
-          </div>
+      <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between shrink-0 relative z-30">
+  {/* Left: Title & Mobile Menu */}
+  <div className="flex items-center gap-3">
+    <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-gray-500 lg:hidden">
+      <Menu size={20} />
+    </button>
+    <h1 className="font-bold text-lg md:text-xl text-gray-800 shrink-0">The Hire Ground Podcast</h1>
+  </div>
 
-          {/* Admin / Login Button: More compact on small screens */}
-          {isAdminMode ? (
-            <button 
-              onClick={() => setIsModalOpen(true)} 
-              className="bg-blue-600 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm active:scale-95 transition-transform"
-            >
-              <Plus size={18} /> 
-              <span className="hidden md:inline text-sm font-medium">Add Video</span>
-            </button>
-          ) : (
-            <button 
-              onClick={() => setShowPasswordModal(true)} 
-              className="text-gray-400 hover:text-gray-600 p-1.5 transition-colors"
-            >
-              <Lock size={18} />
-            </button>
-          )}
-        </div>
-      </header>
+  {/* Center: The Centered Search Bar (Hidden on very small screens) */}
+  <div className="hidden md:flex flex-1 max-w-2xl mx-12">
+  <form onSubmit={handleAISearch} className="relative w-full group">
+    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-gray-400">
+      <Sparkles size={18} className="text-blue-500 animate-pulse" />
+    </div>
+    <input 
+      type="text" 
+      placeholder="Ask AI about episodes..." 
+      value={filterState.searchQuery}
+      onChange={(e) => setFilterState(prev => ({...prev, searchQuery: e.target.value}))}
+      className="w-full pl-12 pr-24 py-3 bg-white rounded-xl border border-gray-200 shadow-sm outline-none focus:ring-4 focus:ring-blue-50 transition-all text-sm font-medium"
+    />
+    <button 
+      type="submit"
+      className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-all shadow-md active:scale-95"
+    >
+      Search
+    </button>
+  </form>
+</div>
+  
+  {/* Right: Actions */}
+  <div className="flex items-center gap-4 shrink-0">
+    <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+       {/* ... your existing viewMode toggle buttons ... */}
+    </div>
+    
+    {isAdminMode ? (
+      <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white p-2 md:px-4 rounded-lg flex items-center gap-2">
+        <Plus size={18} />
+      </button>
+    ) : (
+      <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 flex items-center gap-2 hover:text-gray-600 uppercase text-[10px] font-bold tracking-widest">
+        <Lock size={14} /> Admin Login
+      </button>
+    )}
+  </div>
+</header>
 
       {/* VIDEO FEED: High-density grid settings */}
       <main className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50">

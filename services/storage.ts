@@ -39,5 +39,18 @@ export const videoStorage = {
   // Delete a video from Firestore
   delete: async (id: string) => {
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+  },
+  searchWithAI: async (query: string): Promise<VideoEntry[]> => {
+    const allVideos = await videoStorage.getAll();
+    
+    // For a basic version, we'll do a smart keyword match.
+    // If you have your Gemini API key set up, you can replace this 
+    // with a call to your geminiService.ts for true semantic search.
+    const searchTerms = query.toLowerCase().split(' ');
+    
+    return allVideos.filter(video => {
+      const content = `${video.title} ${video.headline} ${video.guestName} ${video.topics.join(' ')}`.toLowerCase();
+      return searchTerms.every(term => content.includes(term));
+    });
   }
 };
