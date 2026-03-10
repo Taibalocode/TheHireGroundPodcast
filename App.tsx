@@ -3,9 +3,13 @@ import { VideoEntry, FilterState } from './types';
 import { FilterSidebar } from './components/FilterSidebar';
 import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
-import { Lock, Plus, List, LayoutGrid, Grid, Menu, Sparkles } from 'lucide-react';
 import { AddVideoModal } from './components/AddVideoModal';
 import { logEvent } from './services/logger';
+import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags } from 'lucide-react';
+import { searchVideosWithAI } from './services/geminiService';
+import { Documentation } from './components/Documentation';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { TagManager } from './components/TagManager';
 
 const ADMIN_PASSWORD = "Ta1Bal0gun!";
 
@@ -29,6 +33,11 @@ const App: React.FC = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
+  const [view, setView] = useState<'directory' | 'docs' | 'analytics' | 'tags'>('directory');
+  
+  const [aiQuery, setAiQuery] = useState('');
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const [aiResultIds, setAiResultIds] = useState<string[] | null>(null);
   useEffect(() => {
     const fetchVideos = async () => {
       try {
@@ -50,26 +59,74 @@ const App: React.FC = () => {
 
   const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort(), [videos]);
   const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics || []))).sort(), [videos]);
+  const handleAiSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+
+    setIsAiSearching(true);
+    setFilterState(prev => ({ ...prev, aiSearchActive: true }));
+
+    try {
+        const ids = await searchVideosWithAI(aiQuery, videos);
+        setAiResultIds(ids);
+    } catch (err) {
+        console.error("AI Search failed:", err);
+    } finally {
+        setIsAiSearching(false);
+    }
+  };
+
+  const clearAiSearch = () => {
+    setAiQuery('');
+    setAiResultIds(null);
+    setFilterState(prev => ({ ...prev, aiSearchActive: false }));
+  };
 
   const filteredVideos = useMemo(() => {
-    return videos.filter(video => {
-      const matchesSearch = !filterState.searchQuery || 
-        video.title.toLowerCase().includes(filterState.searchQuery.toLowerCase());
+  // 1. Start with all videos
+  let result = videos;
 
-      const matchesProfiles = filterState.selectedProfiles.length === 0 || 
-        filterState.selectedProfiles.every(p => video.guestProfiles?.includes(p));
+  // 2. Apply AI Search OR Text Search
+  if (filterState.aiSearchActive && aiResultIds) {
+    result = result.filter(v => aiResultIds.includes(v.id));
+  } else if (filterState.searchQuery) {
+    const q = filterState.searchQuery.toLowerCase();
+    result = result.filter(v => 
+      v.title.toLowerCase().includes(q) || 
+      (v.guestName && v.guestName.toLowerCase().includes(q)) ||
+      (v.topics && v.topics.some(t => t.toLowerCase().includes(q)))
+    );
+  }
 
-      const matchesTopics = filterState.selectedTopics.length === 0 || 
-        filterState.selectedTopics.every(t => video.topics?.includes(t));
+  // 3. Apply Profile Filters
+  if (filterState.selectedProfiles.length > 0) {
+    result = result.filter(v => 
+      filterState.selectedProfiles.every(p => v.guestProfiles?.includes(p))
+    );
+  }
 
-      // FIXED: Added check for 'videos' (Full Episodes)
-      const matchesShorts = filterState.shortsFilter === 'all' || 
-        (filterState.shortsFilter === 'shorts' && video.isShort === 'Y') ||
-        (filterState.shortsFilter === 'videos' && video.isShort !== 'Y');
+  // 4. Apply Topic Filters
+  if (filterState.selectedTopics.length > 0) {
+    result = result.filter(v => 
+      filterState.selectedTopics.every(t => v.topics?.includes(t))
+    );
+  }
 
-      return matchesSearch && matchesProfiles && matchesTopics && matchesShorts;
-    });
-  }, [videos, filterState]);
+  // 5. Apply Shorts / Full Episodes Filter
+  if (filterState.shortsFilter === 'shorts') {
+    result = result.filter(v => v.isShort === 'Y');
+  } else if (filterState.shortsFilter === 'videos') {
+    result = result.filter(v => v.isShort !== 'Y');
+  }
+
+  // 6. Optional but recommended: Sort by newest first
+  return result.sort((a, b) => {
+    const dateA = new Date(a.publishedAt || a.createdAt).getTime();
+    const dateB = new Date(b.publishedAt || b.createdAt).getTime();
+    return dateB - dateA;
+  });
+
+}, [videos, filterState, aiResultIds]);
 
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   const handleAISearch = async (e?: React.FormEvent) => {
@@ -87,6 +144,16 @@ const App: React.FC = () => {
     console.error("AI Search failed, falling back to local filter", err);
   } finally {
     setIsLoading(false);
+  }
+}; const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
+  // Uses your async storage method to update the DB
+  await videoStorage.update(id, updates);
+  const updated = await videoStorage.getAll();
+  setVideos(updated); // Refreshes the UI instantly
+  
+  if (isModalOpen) {
+    setIsModalOpen(false);
+    setEditingVideo(null);
   }
 };
   return (
@@ -121,81 +188,126 @@ const App: React.FC = () => {
     <div className="flex-1 flex flex-col min-w-0 h-full relative z-10">
       
       {/* HEADER: Updated with min-w-0 and adjusted spacing for mobile density */}
-      <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between shrink-0 relative z-30">
-  {/* Left: Title & Mobile Menu */}
-  <div className="flex items-center gap-3">
-    <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-gray-500 lg:hidden">
+      <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 flex items-center justify-between shrink-0 relative z-30 gap-3 md:gap-6">
+  
+  {/* 1. LEFT: Brand & Mobile Menu */}
+  <div className="flex items-center gap-2 min-w-0 shrink-0">
+    <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden shrink-0">
       <Menu size={20} />
     </button>
-    <h1 className="font-bold text-lg md:text-xl text-gray-800 shrink-0">The Hire Ground Podcast</h1>
+    <h1 className="font-bold text-base md:text-xl truncate hidden sm:block text-gray-900">The Hire Ground</h1>
   </div>
 
-  {/* Center: The Centered Search Bar (Hidden on very small screens) */}
-  <div className="hidden md:flex flex-1 max-w-2xl mx-12">
-  <form onSubmit={handleAISearch} className="relative w-full group">
-    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-gray-400">
-      <Sparkles size={18} className="text-blue-500 animate-pulse" />
-    </div>
-    <input 
-      type="text" 
-      placeholder="Ask AI about episodes..." 
-      value={filterState.searchQuery}
-      onChange={(e) => setFilterState(prev => ({...prev, searchQuery: e.target.value}))}
-      className="w-full pl-12 pr-24 py-3 bg-white rounded-xl border border-gray-200 shadow-sm outline-none focus:ring-4 focus:ring-blue-50 transition-all text-sm font-medium"
-    />
-    <button 
-      type="submit"
-      className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-all shadow-md active:scale-95"
-    >
-      Search
-    </button>
-  </form>
-</div>
-  
-  {/* Right: Actions */}
-  <div className="flex items-center gap-4 shrink-0">
-    <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
-       {/* ... your existing viewMode toggle buttons ... */}
-    </div>
-    
-    {isAdminMode ? (
-      <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white p-2 md:px-4 rounded-lg flex items-center gap-2">
-        <Plus size={18} />
-      </button>
-    ) : (
-      <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 flex items-center gap-2 hover:text-gray-600 uppercase text-[10px] font-bold tracking-widest">
-        <Lock size={14} /> Admin Login
-      </button>
-    )}
+  {/* 2. CENTER: AI Search Bar */}
+  <div className="flex-1 flex items-center justify-center max-w-2xl">
+    <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-xl border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all overflow-hidden h-10 md:h-12 group">
+        <div className="pl-3 text-gray-400 flex items-center justify-center shrink-0">
+            {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={18} /> : <Sparkles className={`transition-colors ${aiResultIds ? "text-blue-600" : "text-gray-400 group-hover:text-blue-400"}`} size={18} />}
+        </div>
+        <input 
+            type="text" 
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            placeholder="Ask AI about episodes..."
+            className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
+        />
+        {aiResultIds && (
+            <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center bg-gray-50 transition-colors">
+                <X size={16} />
+            </button>
+        )}
+        <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm transition-colors whitespace-nowrap disabled:opacity-50">
+            Search
+        </button>
+    </form>
+  </div>
+
+  {/* 3. RIGHT: Actions (View Toggles & Admin) */}
+  <div className="flex items-center gap-3 shrink-0">
+     {/* Standard Layout Toggles (Hidden on very small screens to make room for search) */}
+     {view === 'directory' && (
+        <div className="hidden md:flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+          {(['list', 'grid', 'expanded'] as ViewMode[]).map((mode) => (
+            <button 
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`p-1.5 rounded-md transition-all ${viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
+            >
+              {mode === 'list' && <List size={16} />}
+              {mode === 'grid' && <LayoutGrid size={16} />}
+              {mode === 'expanded' && <Grid size={16} />}
+            </button>
+          ))}
+        </div>
+     )}
+     
+     {/* Admin Controls */}
+     {isAdminMode ? (
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Admin Tabs - visible on larger screens */}
+          <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
+          <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
+          <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
+          
+          <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95">
+            <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
+          </button>
+        </div>
+     ) : (
+        <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
+          <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
+        </button>
+     )}
   </div>
 </header>
 
       {/* VIDEO FEED: High-density grid settings */}
-      <main className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-4 md:mb-6">
-             <p className="text-xs md:text-sm text-gray-500 font-medium">
-               Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes
-             </p>
-          </div>
+      <main className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50 relative z-10">
+  {/* VIEW 1: THE PUBLIC DIRECTORY */}
+  {view === 'directory' && (
+    <div className="max-w-7xl mx-auto">
+      <div className="mb-4 md:mb-6">
+         <p className="text-xs md:text-sm text-gray-500 font-medium">
+           Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes
+           {filterState.aiSearchActive && <span className="ml-2 text-blue-600 font-medium">(AI Filter Active)</span>}
+         </p>
+      </div>
 
-          <div className={`grid gap-2 md:gap-4 ${
-            viewMode === 'list' ? 'grid-cols-1' : 
-            viewMode === 'grid' ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' : 
-            'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6'
-          }`}>
-            {filteredVideos.map(video => (
-              <VideoCard 
-                key={video.id} 
-                video={video} 
-                isAdmin={isAdminMode} 
-                viewMode={viewMode}
-                onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
-              />
-            ))}
-          </div>
+      {filteredVideos.length > 0 ? (
+        <div className={`grid gap-2 md:gap-4 ${
+          viewMode === 'list' ? 'grid-cols-1' : 
+          viewMode === 'grid' ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' : 
+          'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6'
+        }`}>
+          {filteredVideos.map(video => (
+            <VideoCard 
+              key={video.id} 
+              video={video} 
+              isAdmin={isAdminMode} 
+              viewMode={viewMode}
+              onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
+            />
+          ))}
         </div>
-      </main>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">No episodes found</h3>
+            <p className="text-gray-500 max-w-sm mx-auto">Try adjusting your filters or search query.</p>
+            {aiQuery && <button onClick={clearAiSearch} className="mt-4 text-blue-600 font-medium hover:underline">Clear Search</button>}
+        </div>
+      )}
+    </div>
+  )}
+
+  {/* VIEW 2: ANALYTICS DASHBOARD */}
+  {view === 'analytics' && <AnalyticsDashboard />}
+
+  {/* VIEW 3: TAG MANAGER */}
+  {view === 'tags' && <TagManager videos={videos} onUpdate={handleVideoUpdate} />}
+
+  {/* VIEW 4: SYSTEM DOCUMENTATION */}
+  {view === 'docs' && <Documentation />}
+</main>
     </div>
 
     {/* MODALS */}
@@ -223,18 +335,31 @@ const App: React.FC = () => {
     )}
 
     {isModalOpen && (
-      <AddVideoModal 
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
-        editVideo={editingVideo}
-        onAdd={async (v) => { await videoStorage.add(v); const updated = await videoStorage.getAll(); setVideos(updated); setIsModalOpen(false); }}
-        onUpdate={async (id, v) => { await videoStorage.update(id, v); const updated = await videoStorage.getAll(); setVideos(updated); setIsModalOpen(false); setEditingVideo(null); }}
-        onDelete={async (id) => { if(window.confirm('Delete?')){ await videoStorage.delete(id); const updated = await videoStorage.getAll(); setVideos(updated); setIsModalOpen(false); setEditingVideo(null); }}}
-        availableProfiles={allProfiles}
-        availableTopics={allTopics}
-        availableAudiences={[]}
-      />
-    )}
+  <AddVideoModal 
+    isOpen={isModalOpen}
+    onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
+    editVideo={editingVideo}
+    onAdd={async (v) => { 
+      await videoStorage.add(v); 
+      const updated = await videoStorage.getAll(); 
+      setVideos(updated); 
+      setIsModalOpen(false); 
+    }}
+    onUpdate={handleVideoUpdate} // <-- Now using our centralized helper
+    onDelete={async (id) => { 
+      if(window.confirm('Delete?')){ 
+        await videoStorage.delete(id); 
+        const updated = await videoStorage.getAll(); 
+        setVideos(updated); 
+        setIsModalOpen(false); 
+        setEditingVideo(null); 
+      }
+    }}
+    availableProfiles={allProfiles}
+    availableTopics={allTopics}
+    availableAudiences={[]}
+  />
+)}
   </div>
 );
 };
