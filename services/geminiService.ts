@@ -1,12 +1,10 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, VideoEntry } from "../types";
-import { normalizeTags, toTitleCase } from "../utils/stringUtils";
 
 const getAiClient = () => {
-  // Always obtain the API key exclusively from process.env.API_KEY as per guidelines.
+  // Always obtain the API key exclusively from process.env.API_KEY
   if (!process.env.API_KEY) {
-    throw new Error("API Key is missing. Please ensure you have a valid key.");
+    throw new Error("API Key is missing. Please ensure you have a valid key in .env.local");
   }
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 }
@@ -19,7 +17,6 @@ export const analyzeVideoContent = async (
 ): Promise<AnalysisResult> => {
   const ai = getAiClient();
 
-  // Defined responseSchema without using the non-standard Schema type import
   const schema = {
     type: Type.OBJECT,
     properties: {
@@ -30,73 +27,50 @@ export const analyzeVideoContent = async (
       guestProfiles: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "Job Profiles (e.g. Salesperson, Consultant, Finance Executive, Student).",
+        description: "List of roles or titles representing the guest (e.g. CEO, Data Engineer). Max 3."
       },
-      targetAudience: { 
+      targetAudience: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "List of primary audiences (e.g. Entry Level, Executive, General, Data Professionals)." 
+        description: "Who this video is for (e.g. Students, Mid-Career, Technologists)."
       },
       topics: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "List of 1-5 main topics discussed.",
-      },
-    },
-    required: ["guestProfiles", "topics", "headline", "isShort", "targetAudience"],
+        description: "Key topics discussed (e.g. Interviewing, Leadership, Artificial Intelligence). Max 5."
+      }
+    }
   };
 
-  try {
-    const prompt = `
-      You are a content strategist for "The Hire Ground Podcast".
-      Analyze the video metadata.
-      
-      Extract:
-      1. Guest Name (if mentioned).
-      2. Headline: A short, punchy summary.
-      3. Full Description: Combine the existing description with any inferred guest bio or detailed context.
-      4. Is it a Short?: Identify if this is a YouTube Short. Clues: URL contains '/shorts/', title includes '#shorts', or content is extremely brief (under 60s context). 
-         Return 'Y' if it is a short, 'N' if it is a regular video.
-      5. Job/Guest Profiles (Standardize to: Student, Salesperson, Consultant, Executive, Recruiter, etc).
-      6. Target Audience (Who is this for?). Return as a list of distinct groups.
-      7. Topics (Key themes).
-
-      Input:
-      URL: ${url || "N/A"}
-      Title: ${title}
-      Description: ${description}
-      Transcript Snippet: ${transcriptSnippet || "N/A"}
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        temperature: 0.3,
-      },
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("No response from Gemini.");
-
-    const result = JSON.parse(text) as AnalysisResult;
+  const prompt = `
+    Analyze the following podcast/video details and extract structured metadata to help categorize it in our directory.
     
-    // Normalize casing
-    result.guestProfiles = normalizeTags(result.guestProfiles);
-    result.topics = normalizeTags(result.topics);
-    result.targetAudience = normalizeTags(result.targetAudience || []);
-    result.isShort = result.isShort === 'Y' ? 'Y' : 'N';
-    
-    return result;
-  } catch (error) {
-    console.error("Gemini Analysis Failed:", error);
-    throw error;
+    Title: ${title}
+    Description: ${description}
+    ${transcriptSnippet ? `Transcript Snippet: ${transcriptSnippet}` : ''}
+    ${url ? `URL: ${url}` : ''}
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-1.5-flash", // FIX 1: Using the stable, public model
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    },
+  });
+
+  // FIX 2: response.text is a property, not a function
+  const resultText = response.text;
+  
+  if (!resultText) {
+    throw new Error("Failed to generate content");
   }
+
+  return JSON.parse(resultText) as AnalysisResult;
 };
 
-export const parseBulkVideoInput = async (rawText: string): Promise<Omit<VideoEntry, 'id' | 'createdAt'>[]> => {
+export const parseBulkVideoInput = async (bulkText: string): Promise<any[]> => {
   const ai = getAiClient();
 
   const schema = {
@@ -104,62 +78,38 @@ export const parseBulkVideoInput = async (rawText: string): Promise<Omit<VideoEn
     items: {
       type: Type.OBJECT,
       properties: {
-        youtubeId: { type: Type.STRING },
-        title: { type: Type.STRING },
-        headline: { type: Type.STRING },
-        fullDescription: { type: Type.STRING },
-        isShort: { type: Type.STRING, enum: ["Y", "N"], description: "Y for shorts, N for videos." },
-        guestName: { type: Type.STRING },
-        guestProfiles: { type: Type.ARRAY, items: { type: Type.STRING } },
-        targetAudience: { type: Type.ARRAY, items: { type: Type.STRING } },
-        topics: { type: Type.ARRAY, items: { type: Type.STRING } },
-        spotifyUrl: { type: Type.STRING }
-      },
-      required: ["title", "guestProfiles", "topics", "isShort", "targetAudience"]
+        youtubeId: { type: Type.STRING, description: "Extract the 11-character YouTube video ID if a URL is present." },
+        title: { type: Type.STRING, description: "The title of the video/episode." },
+        guestName: { type: Type.STRING, description: "Name of the guest, if applicable." },
+        guestProfiles: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Inferred professional roles (e.g., Software Engineer)." },
+        topics: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Inferred topics." },
+        isShort: { type: Type.STRING, enum: ["Y", "N"], description: "Y if it looks like a YouTube Short URL, otherwise N." }
+      }
     }
   };
 
-  try {
-    const prompt = `
-      Parse this list of podcast episodes/videos.
-      
-      Task:
-      1. Extract Title.
-      2. Extract YouTube ID if a YouTube link is present.
-      3. Identify if it is a YouTube Short ('Y' for Shorts, 'N' for regular videos). Look for '#shorts' or '/shorts/' links.
-      4. Extract Spotify URL if a Spotify link is present.
-      5. Generate a 'headline' and 'fullDescription'.
-      6. Infer Guest Name, Job Profiles, Target Audience (as list), and Topics.
-      
-      Raw Text:
-      ${rawText}
-    `;
+  const prompt = `
+    You are a data extraction assistant. The user has provided a raw list of video titles, URLs, or notes.
+    Extract the individual videos and return them as a structured JSON array.
+    
+    Raw Input:
+    ${bulkText}
+  `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        temperature: 0.1, 
-      },
-    });
+  const response = await ai.models.generateContent({
+    model: "gemini-1.5-flash", // FIX 1
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    },
+  });
 
-    const text = response.text;
-    if (!text) return [];
-
-    const results = JSON.parse(text) as (Omit<VideoEntry, 'id' | 'createdAt'> & { targetAudience?: string[] })[];
-    return results.map(r => ({
-      ...r,
-      guestProfiles: normalizeTags(r.guestProfiles),
-      topics: normalizeTags(r.topics),
-      targetAudience: normalizeTags(r.targetAudience || []),
-      isShort: r.isShort === 'Y' ? 'Y' : 'N'
-    }));
-  } catch (error) {
-    console.error("Bulk Import Failed:", error);
-    throw error;
-  }
+  // FIX 2
+  const resultText = response.text;
+  if (!resultText) return [];
+  
+  return JSON.parse(resultText);
 };
 
 export const searchVideosWithAI = async (
@@ -168,12 +118,12 @@ export const searchVideosWithAI = async (
 ): Promise<string[]> => {
   const ai = getAiClient();
 
+  // Strip down the data so we don't overload the AI's context window
   const catalog = videos.map(v => ({
     id: v.id,
     title: v.title,
     headline: v.headline,
     isShort: v.isShort || 'N',
-    fullDescription: v.fullDescription,
     profiles: v.guestProfiles.join(', '),
     audience: v.targetAudience.join(', '),
     topics: v.topics.join(', ')
@@ -203,7 +153,7 @@ export const searchVideosWithAI = async (
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-flash", // FIX 1
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -211,10 +161,15 @@ export const searchVideosWithAI = async (
       },
     });
 
-    const result = JSON.parse(response.text || "{}");
+    // FIX 2
+    const resultText = response.text;
+    if (!resultText) return [];
+
+    const result = JSON.parse(resultText);
     return result.relevantVideoIds || [];
+    
   } catch (error) {
-    console.error("AI Search Failed:", error);
-    return [];
+    console.error("AI Catalog Search Failed:", error);
+    throw error;
   }
 };

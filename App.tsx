@@ -25,8 +25,8 @@ const App: React.FC = () => {
     aiSearchActive: false,
     shortsFilter: 'all'
   });
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoEntry | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -59,22 +59,31 @@ const App: React.FC = () => {
 
   const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort(), [videos]);
   const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics || []))).sort(), [videos]);
-  const handleAiSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+ const handleAiSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!aiQuery.trim()) return;
 
     setIsAiSearching(true);
-    
+    // CLEAR any text filters so we ONLY rely on AI
+    setFilterState(prev => ({ ...prev, searchQuery: '', aiSearchActive: false }));
+
     try {
-        // Attempt the AI Search
+        console.log("Sending to Gemini:", aiQuery);
         const ids = await searchVideosWithAI(aiQuery, videos);
-        setAiResultIds(ids);
+        
+        if (ids && ids.length > 0) {
+            setAiResultIds(ids);
+            setFilterState(prev => ({ ...prev, aiSearchActive: true }));
+        } else {
+            alert("AI couldn't find matches. Try rephrasing!");
+            setAiResultIds([]); // Show zero results
+            setFilterState(prev => ({ ...prev, aiSearchActive: true }));
+        }
+    } catch (err: any) {
+        console.error("AI Search CRASHED:", err);
+        alert(`AI Error: ${err.message || 'Check console'}. Are you sure your API key is valid?`);
+        setAiResultIds([]); // Force zero results so we know it broke
         setFilterState(prev => ({ ...prev, aiSearchActive: true }));
-    } catch (err) {
-        console.error("AI Search failed, falling back to text search:", err);
-        // Fallback: If AI fails, turn off AI mode so the local text search takes over
-        setAiResultIds(null);
-        setFilterState(prev => ({ ...prev, aiSearchActive: false }));
     } finally {
         setIsAiSearching(false);
     }
@@ -159,6 +168,10 @@ const App: React.FC = () => {
     setEditingVideo(null);
   }
 };
+  function setShowSettingsMenu(arg0: boolean): void {
+    throw new Error('Function not implemented.');
+  }
+  
   return (
   <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
     
@@ -264,14 +277,14 @@ const App: React.FC = () => {
 
     {/* NEW: Settings Menu Toggle */}
     <button 
-      onClick={() => setShowSettingsMenu(!showSettingsMenu)} 
+      onClick={() => setShowSettingsMenu(!setShowSettingsMenu)} 
       className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors ml-1"
     >
       <Settings size={20} />
     </button>
 
     {/* NEW: Settings Dropdown Box */}
-    {showSettingsMenu && (
+    {setShowSettingsMenu && (
   <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
     
     {/* Data Management Section */}
