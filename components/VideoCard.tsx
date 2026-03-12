@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { VideoEntry } from '../types';
 import { Play, ExternalLink, Edit2, Users, Briefcase, Tag, Calendar } from 'lucide-react';
 
@@ -40,7 +40,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     </div>
   ) : null;
 
-  // EXACT RECREATION OF THE SCREENSHOT TAGS
+  // STRUCTURED TAGS FOR THE 5-COLUMN EXPANDED GRID
   const StructuredTagsBlock = () => (
     <div className="flex flex-col gap-2 mt-2 mb-3">
       {video.guestProfiles && video.guestProfiles.length > 0 && (
@@ -122,8 +122,38 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     );
   }
 
-  // 2. GALLERY & DETAILED VIEWS (Vertical Cards)
-  // They share the exact same UI, only the App.tsx grid layout makes them differ in width
+  // 2. GALLERY VIEW (3 Columns - Wide cards, shows Description, hides massive tag list)
+  if (viewMode === 'gallery') {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow relative h-full">
+        <EditButton />
+        <div className="relative aspect-video bg-gray-100 shrink-0 w-full border-b border-gray-100">
+          <img src={thumbnailUrl} alt={video.title} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PENDING_IMAGE; }} />
+          <ShortsBadge />
+        </div>
+        <div className="p-4 flex flex-col flex-1">
+          <div className="mb-2 text-xs text-gray-400 font-medium flex items-center justify-between">
+              {video.publishedAt && <span className="flex items-center gap-1"><Calendar size={12}/> {video.publishedAt}</span>}
+          </div>
+          <h3 className="font-bold text-gray-900 text-base leading-tight line-clamp-2 mb-1" title={video.title}>{video.title}</h3>
+          {video.guestName && <div className="text-sm font-semibold text-gray-600 mb-3">{video.guestName}</div>}
+          
+          {/* Simple Inline Tags so it doesn't take up the whole card */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+             {video.guestProfiles?.slice(0, 2).map(p => <span key={p} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-semibold border border-blue-100">{p}</span>)}
+             {video.topics?.slice(0, 2).map(t => <span key={t} className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-md text-[10px] font-medium border border-gray-200">{t}</span>)}
+          </div>
+          
+          {/* Headline Description pushed down to fill space */}
+          <p className="text-sm text-gray-600 line-clamp-3 mb-4 flex-1">{video.headline}</p>
+          
+          <LinksBlock />
+        </div>
+      </div>
+    );
+  }
+
+  // 3. DETAILED/EXPANDED VIEW (5 Columns - Focuses heavily on the Structured Tags block)
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow relative h-full">
       <EditButton />
@@ -131,14 +161,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
         <img src={thumbnailUrl} alt={video.title} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PENDING_IMAGE; }} />
         <ShortsBadge />
       </div>
-      <div className="p-3 md:p-4 flex flex-col flex-1">
+      <div className="p-3 flex flex-col flex-1">
         <div className="mb-1 text-[10px] sm:text-xs text-gray-400 font-medium flex items-center justify-between">
             {video.publishedAt && <span className="flex items-center gap-1"><Calendar size={12}/> {video.publishedAt}</span>}
         </div>
         <h3 className="font-bold text-gray-900 text-sm md:text-base leading-tight line-clamp-2 mb-1" title={video.title}>{video.title}</h3>
         {video.guestName && <div className="text-xs sm:text-sm font-semibold text-gray-600 mb-2">{video.guestName}</div>}
         
-        <div className="flex-1">
+        {/* Full Tags Block instead of Description */}
+        <div className="flex-1 mt-1 mb-2">
             <StructuredTagsBlock />
         </div>
         
