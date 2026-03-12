@@ -5,7 +5,7 @@ import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
 import { AddVideoModal } from './components/AddVideoModal';
 import { logEvent } from './services/logger';
-import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud, RefreshCcw, FileSpreadsheet } from 'lucide-react';
+import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Layout, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud, RefreshCcw, FileSpreadsheet } from 'lucide-react';
 import { searchVideosWithAI } from './services/geminiService';
 import { Documentation } from './components/Documentation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -247,21 +247,32 @@ const App: React.FC = () => {
   {/* 3. RIGHT: Actions (View Toggles & Admin) */}
   <div className="flex items-center gap-3 shrink-0">
      {/* Standard Layout Toggles (Hidden on very small screens to make room for search) */}
-     {view === 'directory' && (
-        <div className="hidden md:flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
-          {(['list', 'grid', 'expanded'] as ViewMode[]).map((mode) => (
-            <button 
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`p-1.5 rounded-md transition-all ${viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
-            >
-              {mode === 'list' && <List size={16} />}
-              {mode === 'grid' && <LayoutGrid size={16} />}
-              {mode === 'expanded' && <Grid size={16} />}
-            </button>
-          ))}
-        </div>
-     )}
+     {/* View Mode Selectors */}
+{view === 'directory' && (
+   <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
+       <button 
+           onClick={() => setViewMode('list')} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           title="List View"
+       >
+           <List size={18} />
+       </button>
+       <button 
+           onClick={() => setViewMode('gallery')} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           title="Gallery View"
+       >
+           <Layout size={18} />
+       </button>
+       <button 
+           onClick={() => setViewMode('detailed')} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           title="Detailed View"
+       >
+           <Grid size={18} />
+       </button>
+   </div>
+)}
      
      {/* Admin Controls */}
 {isAdminMode ? (
@@ -341,22 +352,22 @@ const App: React.FC = () => {
       </div>
 
       {filteredVideos.length > 0 ? (
-        <div className={`grid gap-2 md:gap-4 ${
-          viewMode === 'list' ? 'grid-cols-1' : 
-          viewMode === 'grid' ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4' : 
-          'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6'
-        }`}>
-          {filteredVideos.map(video => (
+    <div className={`grid gap-4 md:gap-6 ${
+        viewMode === 'list' ? 'grid-cols-1' : 
+        viewMode === 'gallery' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 
+        'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
+    }`}>
+        {filteredVideos.map(video => (
             <VideoCard 
-              key={video.id} 
-              video={video} 
-              isAdmin={isAdminMode} 
-              viewMode={viewMode}
-              onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }} 
+                key={video.id} 
+                video={video} 
+                isAdmin={isAdminMode} 
+                onEdit={() => { setEditingVideo(video); setIsModalOpen(true); }}
+                viewMode={viewMode}
             />
-          ))}
-        </div>
-      ) : (
+        ))}
+    </div>
+) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
             <h3 className="text-lg font-bold text-gray-900 mb-1">No episodes found</h3>
             <p className="text-gray-500 max-w-sm mx-auto">Try adjusting your filters or search query.</p>
