@@ -4,9 +4,9 @@ import { FilterSidebar } from './components/FilterSidebar';
 import { VideoCard, ViewMode } from './components/VideoCard';
 import { videoStorage } from './services/storage';
 import { AddVideoModal } from './components/AddVideoModal';
-import { logEvent } from './services/logger';
-import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Layout, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud, RefreshCcw, FileSpreadsheet } from 'lucide-react';
+import { Sparkles, Lock, Plus, List, LayoutGrid, Grid, Layout, Menu, X, Loader2, BookOpen, BarChart3, Tags, Settings, Download, FileJson, UploadCloud, RefreshCcw, Database, FileSpreadsheet } from 'lucide-react';
 import { searchVideosWithAI } from './services/geminiService';
+import { logEvent, getLogs, initLoggerSession, downloadLogsAsCsv, downloadLogsAsJson } from './services/logger';
 import { Documentation } from './components/Documentation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { TagManager } from './components/TagManager';
@@ -59,6 +59,7 @@ const App: React.FC = () => {
 
   const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort(), [videos]);
   const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics || []))).sort(), [videos]);
+  const allAudiences = useMemo(() => Array.from(new Set(videos.flatMap(v => v.targetAudience || []))).sort(), [videos]);
  const handleAiSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!aiQuery.trim()) return;
@@ -139,7 +140,65 @@ const App: React.FC = () => {
   });
 
 }, [videos, filterState, aiResultIds]);
+const downloadVideosAsJson = () => {
+    const blob = new Blob([JSON.stringify(videos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hire_ground_db_backup_${new Date().toISOString().slice(0,10)}.json`;
+    link.click();
+  };
 
+  const downloadVideosAsCsv = () => {
+    if (videos.length === 0) return;
+    const headers = [
+      "YouTubeID", "Title", "Headline", "FullDescription", "GuestName", 
+      "GuestProfiles", "TargetAudience", "Topics", "Transcript", "PublishedDate", "IsShort", "SpotifyUrl"
+    ];
+    const rows = videos.map(v => [
+      v.youtubeId,
+      `"${(v.title || '').replace(/"/g, '""')}"`,
+      `"${(v.headline || '').replace(/"/g, '""')}"`,
+      `"${(v.fullDescription || '').replace(/"/g, '""')}"`,
+      `"${(v.guestName || '').replace(/"/g, '""')}"`,
+      `"${v.guestProfiles.join(', ')}"`,
+      `"${(v.targetAudience || []).join(', ')}"`,
+      `"${v.topics.join(', ')}"`,
+      `"${(v.transcript || '').replace(/"/g, '""')}"`,
+      v.publishedAt || '',
+      v.isShort || 'N',
+      v.spotifyUrl || ''
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `hire_ground_videos_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  };
+
+  const handleResetApp = async () => {
+    if (window.confirm("⚠️ CLOUD FACTORY RESET ⚠️\n\nThis will permanently delete all documents in your Firestore database and restore the master catalog.\n\nAre you absolutely sure?")) {
+        try {
+            logEvent('ADMIN_FACTORY_RESET_START');
+            
+            // 1. Tell the storage service to wipe Firestore and re-seed
+            await videoStorage.reset(); 
+            
+            // 2. Clear local cache just in case
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // 3. Reload the page to fetch the fresh database
+            const reloadUrl = window.location.origin + window.location.pathname + '?reset=' + Date.now();
+            window.location.replace(reloadUrl);
+        } catch (e) {
+            console.error("Firestore Reset failed", e);
+            alert("Failed to reset the database. Check console for Firebase errors.");
+        }
+    }
+  };
   if (isLoading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   const handleAISearch = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
@@ -157,17 +216,39 @@ const App: React.FC = () => {
   } finally {
     setIsLoading(false);
   }
-}; const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
-  // Uses your async storage method to update the DB
-  await videoStorage.update(id, updates);
-  const updated = await videoStorage.getAll();
-  setVideos(updated); // Refreshes the UI instantly
-  
-  if (isModalOpen) {
-    setIsModalOpen(false);
-    setEditingVideo(null);
-  }
-};
+}; const handleVideoAdd = async (newVideo: Omit<VideoEntry, 'id' | 'createdAt'>) => {
+      // 1. Give the new video a unique ID and timestamp
+      const completeVideo: VideoEntry = {
+          ...newVideo,
+          id: crypto.randomUUID(),
+          createdAt: Date.now()
+      };
+      
+      // 2. Save to Firestore and get the fresh list back
+      const updatedList = await videoStorage.add(completeVideo); 
+      
+      // 3. Update the screen and close modal
+      setVideos(updatedList);
+      setIsModalOpen(false);
+  };
+
+  const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
+      const updatedList = await videoStorage.update(id, updates);
+      setVideos(updatedList); 
+      if (isModalOpen) {
+          setIsModalOpen(false);
+          setEditingVideo(null);
+      }
+  };
+
+  const handleVideoDelete = async (id: string) => {
+      if (window.confirm("Are you sure you want to permanently delete this episode?")) {
+          const updatedList = await videoStorage.delete(id);
+          setVideos(updatedList);
+          setIsModalOpen(false);
+          setEditingVideo(null);
+      }
+  };
   function setShowSettingsMenu(arg0: boolean): void {
     throw new Error('Function not implemented.');
   }
@@ -186,7 +267,8 @@ const App: React.FC = () => {
         filterState={filterState}
         setFilterState={setFilterState}
         availableProfiles={allProfiles}
-        availableTopics={allTopics} 
+        availableTopics={allTopics}
+
         isOpenMobile={isMobileMenuOpen}
         closeMobile={() => setIsMobileMenuOpen(false)} 
       />
@@ -286,50 +368,63 @@ const App: React.FC = () => {
       <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
     </button>
 
-    {/* NEW: Settings Menu Toggle */}
+    {/* Settings Dropdown */}
+<div className="relative flex items-center h-10">
     <button 
-      onClick={() => setShowSettingsMenu(!setShowSettingsMenu)} 
-      className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors ml-1"
+        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+        className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors ${isSettingsOpen ? 'bg-gray-100 text-blue-600' : ''}`}
     >
-      <Settings size={20} />
+        <Settings size={20} />
     </button>
+    
+    {isSettingsOpen && (
+        <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)} />
+            <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 animate-slideDown origin-top-right">
+                <div className="p-2 space-y-1">
+                    
+                    {/* System Section */}
+                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
+                    <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                        <UploadCloud size={14} className="text-green-600" /> Publish Updates
+                    </button>
+                    <button onClick={() => { handleResetApp(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                        <RefreshCcw size={14} className="text-red-600" /> Factory Reset
+                    </button>
+                    
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    
+                    {/* Data Export Section */}
+                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
+                    <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                        <Database size={14} className="text-blue-600" /> Export Videos (CSV)
+                    </button>
+                    <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                        <FileJson size={14} className="text-indigo-600" /> Backup Database (JSON)
+                    </button>
+                    
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    
+                    {/* Logs Section */}
+                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
+                    <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                        <FileSpreadsheet size={14} className="text-emerald-600" /> Activity Logs (CSV)
+                    </button>
+                    <button onClick={() => { downloadLogsAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                        <FileJson size={14} className="text-amber-600" /> Save Logs (logFile.json)
+                    </button>
 
-    {/* NEW: Settings Dropdown Box */}
-    {setShowSettingsMenu && (
-  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-    
-    {/* Data Management Section */}
-    <div className="px-4 py-2 border-b border-gray-50 mb-1">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Data Management</p>
-    </div>
-    
-    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
-      <FileSpreadsheet size={16} className="text-gray-400" /> Export to CSV
-    </button>
-    
-    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
-      <FileJson size={16} className="text-gray-400" /> JSON Backup
-    </button>
-    
-    <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
-      <BarChart3 size={16} className="text-gray-400" /> Export Activity Logs
-    </button>
-    
-    {/* System Actions Section */}
-    <div className="px-4 py-2 border-b border-gray-50 mb-1 mt-2">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">System Actions</p>
-    </div>
-    
-    <button className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-3 transition-colors font-medium">
-      <UploadCloud size={16} /> Publish seedData.ts
-    </button>
-    
-    <button className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors font-medium">
-      <RefreshCcw size={16} /> Factory Reset
-    </button>
-    
-  </div>
-)}
+                    <div className="h-px bg-gray-100 my-1"></div>
+                    
+                    {/* Exit Admin */}
+                    <button onClick={() => { setIsAdminMode(false); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
+                        Exit Admin
+                    </button>
+                </div>
+            </div>
+        </>
+    )}
+</div>
   </div>
 ) : (
   <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
@@ -413,31 +508,30 @@ const App: React.FC = () => {
     )}
 
     {isModalOpen && (
-  <AddVideoModal 
-    isOpen={isModalOpen}
-    onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
-    editVideo={editingVideo}
-    onAdd={async (v) => { 
-      await videoStorage.add(v); 
-      const updated = await videoStorage.getAll(); 
-      setVideos(updated); 
-      setIsModalOpen(false); 
-    }}
-    onUpdate={handleVideoUpdate} // <-- Now using our centralized helper
-    onDelete={async (id) => { 
-      if(window.confirm('Delete?')){ 
-        await videoStorage.delete(id); 
-        const updated = await videoStorage.getAll(); 
-        setVideos(updated); 
-        setIsModalOpen(false); 
-        setEditingVideo(null); 
-      }
-    }}
-    availableProfiles={allProfiles}
-    availableTopics={allTopics}
-    availableAudiences={[]}
-  />
-)}
+        <AddVideoModal 
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
+          editVideo={editingVideo}
+          availableProfiles={allProfiles}
+          availableTopics={allTopics}
+          availableAudiences={allAudiences}
+          // THE FIX: We intercept 'v' and add the missing ID and Timestamp
+          onAdd={async (v) => { 
+            const completeVideo = {
+              ...v,
+              id: crypto.randomUUID(),
+              createdAt: Date.now()
+            } as VideoEntry;
+            
+            // videoStorage.add now automatically returns the fresh list!
+            const updated = await videoStorage.add(completeVideo); 
+            setVideos(updated); 
+            setIsModalOpen(false); 
+          }}
+          onUpdate={handleVideoUpdate}
+          onDelete={handleVideoDelete}
+        />
+      )}
   </div>
 );
 };
