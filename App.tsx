@@ -27,6 +27,7 @@ const App: React.FC = () => {
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoEntry | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -289,149 +290,139 @@ const downloadVideosAsJson = () => {
       <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 flex items-center justify-between shrink-0 relative z-30 gap-3 md:gap-6">
   
   {/* 1. LEFT: Brand & Mobile Menu */}
-  <div className="flex items-center gap-2 min-w-0 shrink-0">
-    <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden shrink-0">
-      <Menu size={20} />
-    </button>
-    <h1 className="font-bold text-base md:text-xl truncate hidden sm:block text-gray-900">The Hire Ground Podcast</h1>
-  </div>
-
-  {/* 2. CENTER: AI Search Bar */}
-  <div className="flex-1 flex items-center justify-center max-w-2xl">
-    <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-xl border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all overflow-hidden h-10 md:h-12 group">
-        <div className="pl-3 text-gray-400 flex items-center justify-center shrink-0">
-            {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={18} /> : <Sparkles className={`transition-colors ${aiResultIds ? "text-blue-600" : "text-gray-400 group-hover:text-blue-400"}`} size={18} />}
-        </div>
-        <input 
-    type="text" 
-    value={aiQuery}
-    onChange={(e) => {
-        const val = e.target.value;
-        setAiQuery(val);
-        // Instantly run standard text search as the user types
-        setFilterState(prev => ({ ...prev, searchQuery: val, aiSearchActive: false }));
-        setAiResultIds(null); // Clear previous AI results when they type something new
-    }}
-    placeholder="Ask AI about episodes..."
-    className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
-/>
-        {aiResultIds && (
-            <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center bg-gray-50 transition-colors">
-                <X size={16} />
-            </button>
-        )}
-        <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm transition-colors whitespace-nowrap disabled:opacity-50">
-            Search
-        </button>
-    </form>
-  </div>
-
-  {/* 3. RIGHT: Actions (View Toggles & Admin) */}
-  <div className="flex items-center gap-3 shrink-0">
-     {/* Standard Layout Toggles (Hidden on very small screens to make room for search) */}
-     {/* View Mode Selectors */}
-{view === 'directory' && (
-   <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
-       <button 
-           onClick={() => setViewMode('list')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="List View"
-       >
-           <List size={18} />
-       </button>
-       <button 
-           onClick={() => setViewMode('gallery')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="Gallery View"
-       >
-           <Layout size={18} />
-       </button>
-       <button 
-           onClick={() => setViewMode('detailed')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="Detailed View"
-       >
-           <Grid size={18} />
-       </button>
-   </div>
-)}
-     
-     {/* Admin Controls */}
-{isAdminMode ? (
-  <div className="flex items-center gap-1 md:gap-2 relative">
-    {/* Dashboard Tabs */}
-    <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
-    <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
-    <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
-    
-    <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95">
-      <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
-    </button>
-
-    {/* Settings Dropdown */}
-<div className="relative flex items-center h-10">
-    <button 
-        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-        className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors ${isSettingsOpen ? 'bg-gray-100 text-blue-600' : ''}`}
-    >
-        <Settings size={20} />
-    </button>
-    
-    {isSettingsOpen && (
-        <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 animate-slideDown origin-top-right">
-                <div className="p-2 space-y-1">
-                    
-                    {/* System Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
-                    <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <UploadCloud size={14} className="text-green-600" /> Publish Updates
-                    </button>
-                    <button onClick={() => { handleResetApp(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
-                        <RefreshCcw size={14} className="text-red-600" /> Factory Reset
-                    </button>
-                    
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Data Export Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
-                    <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <Database size={14} className="text-blue-600" /> Export Videos (CSV)
-                    </button>
-                    <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileJson size={14} className="text-indigo-600" /> Backup Database (JSON)
-                    </button>
-                    
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Logs Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
-                    <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileSpreadsheet size={14} className="text-emerald-600" /> Activity Logs (CSV)
-                    </button>
-                    <button onClick={() => { downloadLogsAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileJson size={14} className="text-amber-600" /> Save Logs (logFile.json)
-                    </button>
-
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Exit Admin */}
-                    <button onClick={() => { setIsAdminMode(false); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
-                        Exit Admin
-                    </button>
+  {/* Main Header - Responsive & Mobile Optimized */}
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 md:px-6 py-2 sm:py-4 flex items-center justify-between shrink-0 z-30 relative gap-2 sm:gap-4 min-h-[60px] sm:min-h-[72px]">
+            
+            {/* Left: Mobile Toggle & Brand Section */}
+            <div className="flex items-center gap-1 sm:gap-4 shrink-0">
+                <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden text-gray-500 hover:text-gray-900 p-1 flex items-center justify-center">
+                    <Menu size={24} />
+                </button>
+                <div className="hidden md:flex items-center gap-2">
+                    <h1 className="font-bold text-lg lg:text-xl text-gray-800 whitespace-nowrap leading-none flex items-center gap-2">
+                      The Hire Ground Podcast
+                    </h1>
                 </div>
             </div>
-        </>
-    )}
-</div>
-  </div>
-) : (
-  <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
-    <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
-  </button>
-)}
-  </div>
+
+            {/* Center Area: AI Search - Shrunk for mobile */}
+            <div className="flex-1 flex items-center justify-center min-w-[100px] sm:max-w-xl">
+                <div className="w-full relative">
+                    <div className={`absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg blur opacity-10 transition-opacity ${isAiSearching ? 'opacity-30' : ''}`}></div>
+                    <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-lg border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all overflow-hidden z-10 h-8 sm:h-10">
+                        <div className="pl-2 sm:pl-3 text-gray-400 flex items-center justify-center shrink-0">
+                            {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={14} /> : <Sparkles className={aiResultIds ? "text-blue-600" : "text-gray-400"} size={14} />}
+                        </div>
+                        <input 
+                            type="text" 
+                            value={aiQuery}
+                            onChange={(e) => setAiQuery(e.target.value)}
+                            placeholder="Ask AI..."
+                            className="flex-1 px-2 h-full outline-none text-xs sm:text-sm text-gray-700 placeholder-gray-400 min-w-0"
+                        />
+                        {aiResultIds && (
+                            <button type="button" onClick={clearAiSearch} className="px-2 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center">
+                                <X size={14} />
+                            </button>
+                        )}
+                        <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="hidden sm:flex bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm transition-colors whitespace-nowrap items-center justify-center">
+                            Search
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {/* Right Area: View Selector + Admin Section */}
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                 {/* View Mode Selectors */}
+                 {view === 'directory' && (
+                    <>
+                        {/* Desktop View (Inline Buttons) */}
+                        <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
+                            <button onClick={() => setViewMode('list')} className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} title="List View"><List size={18} /></button>
+                            <button onClick={() => setViewMode('gallery')} className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} title="Gallery View"><Layout size={18} /></button>
+                            <button onClick={() => setViewMode('detailed')} className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} title="Detailed View"><Grid size={18} /></button>
+                        </div>
+
+                        {/* Mobile View (Dropdown Menu) */}
+                        <div className="sm:hidden relative flex items-center h-8">
+                            <button 
+                                onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+                                className="h-full px-2 flex items-center justify-center bg-white border border-gray-200 rounded-md text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+                            >
+                                {viewMode === 'list' ? <List size={16} /> : viewMode === 'gallery' ? <Layout size={16} /> : <Grid size={16} />}
+                            </button>
+                            
+                            {isViewMenuOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsViewMenuOpen(false)} />
+                                    <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col p-1 w-36 animate-slideDown origin-top-right">
+                                        <button onClick={() => { setViewMode('list'); setIsViewMenuOpen(false); }} className={`px-3 py-2 text-sm flex items-center gap-2 rounded-md ${viewMode === 'list' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                            <List size={14} /> List View
+                                        </button>
+                                        <button onClick={() => { setViewMode('gallery'); setIsViewMenuOpen(false); }} className={`px-3 py-2 text-sm flex items-center gap-2 rounded-md ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                            <Layout size={14} /> Gallery
+                                        </button>
+                                        <button onClick={() => { setViewMode('detailed'); setIsViewMenuOpen(false); }} className={`px-3 py-2 text-sm flex items-center gap-2 rounded-md ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                            <Grid size={14} /> Detailed
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </>
+                 )}
+
+                 {/* Admin Controls Area */}
+                 <div className="flex items-center gap-1 sm:gap-2">
+                    {isAdminMode ? (
+                         <div className="flex items-center gap-1 sm:gap-2">
+                            <button onClick={() => setView('analytics')} className={`hidden sm:flex p-2 rounded-full hover:bg-gray-100 text-gray-500 items-center justify-center transition-colors ${view === 'analytics' ? 'text-blue-600 bg-blue-50' : ''}`} title="Analytics"><BarChart3 size={20} /></button>
+                            <button onClick={() => setView('tags')} className={`hidden sm:flex p-2 rounded-full hover:bg-gray-100 text-gray-500 items-center justify-center transition-colors ${view === 'tags' ? 'text-blue-600 bg-blue-50' : ''}`} title="Tag Manager"><Tags size={20} /></button>
+                            <button onClick={() => setView('docs')} className={`hidden sm:flex p-2 rounded-full hover:bg-gray-100 text-gray-500 items-center justify-center transition-colors ${view === 'docs' ? 'text-blue-600 bg-blue-50' : ''}`} title="Documentation"><BookOpen size={20} /></button>
+                            
+                            <button onClick={() => setIsModalOpen(true)} className="flex items-center justify-center gap-1 sm:gap-2 bg-blue-600 text-white px-2 sm:px-4 h-8 sm:h-10 rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 shadow-sm transition-all whitespace-nowrap">
+                                 <Plus size={16} /> <span className="hidden md:inline">Add Video</span>
+                            </button>
+                            
+                            {/* Settings Dropdown */}
+                            <div className="relative flex items-center h-8 sm:h-10">
+                                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className={`p-1.5 sm:p-2 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors ${isSettingsOpen ? 'bg-gray-100 text-blue-600' : ''}`}>
+                                    <Settings size={18} className="sm:w-5 sm:h-5" />
+                                </button>
+                                
+                                {isSettingsOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)} />
+                                        <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 animate-slideDown origin-top-right">
+                                            <div className="p-2 space-y-1">
+                                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
+                                                <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><UploadCloud size={14} className="text-green-600" /> Publish Updates</button>
+                                                <button onClick={() => { handleResetApp(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"><RefreshCcw size={14} className="text-red-600" /> Factory Reset</button>
+                                                <div className="h-px bg-gray-100 my-1"></div>
+                                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
+                                                <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><Database size={14} className="text-blue-600" /> Export Videos (CSV)</button>
+                                                <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><FileJson size={14} className="text-indigo-600" /> Backup Database (JSON)</button>
+                                                <div className="h-px bg-gray-100 my-1"></div>
+                                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
+                                                <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><FileSpreadsheet size={14} className="text-emerald-600" /> Activity Logs (CSV)</button>
+                                                <button onClick={() => { downloadLogsAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><FileJson size={14} className="text-amber-600" /> Save Logs (logFile.json)</button>
+                                                <div className="h-px bg-gray-100 my-1"></div>
+                                                <button onClick={() => { setIsAdminMode(false); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">Exit Admin</button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                         </div>
+                    ) : (
+                         <button onClick={() => setShowPasswordModal(true)} className="h-8 sm:h-10 px-2 sm:px-3 flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest border border-transparent hover:border-gray-200 rounded-lg">
+                            <Lock size={12} className="sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Admin Login</span>
+                         </button>
+                    )}
+                 </div>
+            </div>
+        </div>
 </header>
 
       {/* VIDEO FEED: High-density grid settings */}
