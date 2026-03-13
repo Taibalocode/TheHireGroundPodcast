@@ -1,9 +1,18 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
 import { VideoEntry } from '../types';
 
 // Initialize the Gemini AI client using the VITE_ prefixed environment variable
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+
+// Helper function for the basic text search fallback
+const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
+  const searchTerms = query.toLowerCase().split(' ');
+  return videos.filter(video => {
+    const content = `${video.title} ${video.headline} ${video.guestName} ${(video.topics || []).join(' ')}`.toLowerCase();
+    return searchTerms.every(term => content.includes(term));
+  }).map(v => v.id);
+};
 
 // --- 1. AI SEMANTIC SEARCH BAR ---
 export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): Promise<string[]> => {
@@ -13,60 +22,64 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const lightweightCatalog = videos.map(v => ({
+    const catalog = videos.map(v => ({
       id: v.id,
       title: v.title,
-      guest: v.guestName,
-      topics: v.topics,
-      audience: v.targetAudience,
-      description: v.headline 
+      headline: v.headline,
+      isShort: v.isShort || 'N',
+      fullDescription: v.fullDescription,
+      profiles: v.guestProfiles.join(', '),
+      audience: v.targetAudience.join(', '),
+      topics: v.topics.join(', ')
     }));
 
+    // EXACT AI STUDIO SCHEMA
+    const schema: Schema = {
+      type: SchemaType.OBJECT,
+      properties: {
+        relevantVideoIds: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+          description: "List of video IDs that best match the user's intent.",
+        },
+      },
+      required: ["relevantVideoIds"]
+    };
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+        temperature: 0.1,
+      }
+    });
+
+    // EXACT AI STUDIO PROMPT
     const prompt = `
-      You are the intelligent search engine for "The Hire Ground" podcast.
       User Query: "${query}"
-      
+
+      You are a helpful assistant for a career advice video directory.
+      Select the best videos/shorts from the catalog below that answer the user's question.
+      Return ONLY the IDs of relevant videos.
+
       Catalog:
-      ${JSON.stringify(lightweightCatalog)}
-      
-      Instructions:
-      1. Determine the user's underlying intent. Ignore conversational filler like "videos about", "show me", "episodes on", or "I want to watch".
-      2. Find every video in the catalog that is conceptually relevant to what they are asking for.
-      3. Look at titles, descriptions, topics, and audiences. Connect the dots (e.g., a search for "getting hired" should match videos tagged with "Job Hunt" or "Interviewing").
-      4. Be highly generous. If a video is even partially relevant to the user's core topic, include it.
-      
-      Output strictly a raw JSON array of the matching video IDs. No markdown, no backticks, no explanations.
-      Example: ["id1", "id2"]
-      If nothing matches, return []
+      ${JSON.stringify(catalog)}
     `;
 
-    const result = await model.generateContent(prompt);
-    const textResponse = result.response.text().trim();
+    const response = await model.generateContent(prompt);
+    const result = JSON.parse(response.response.text() || "{}");
     
-    const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
-    
-    const matchedIds: string[] = JSON.parse(cleanJson);
-    console.log(`🧠 AI Search complete. Found ${matchedIds.length} matches.`);
-    
-    return matchedIds;
+    console.log(`🧠 AI Search complete. Found ${result.relevantVideoIds?.length || 0} matches.`);
+    return result.relevantVideoIds || [];
 
   } catch (error) {
-    console.error("Gemini AI Search failed. Falling back to text search.", error);
+    console.error("AI Search Failed. Falling back to text search.", error);
     return fallbackTextSearch(query, videos);
   }
 };
 
-const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
-  const searchTerms = query.toLowerCase().split(' ');
-  return videos.filter(video => {
-    const content = `${video.title} ${video.headline} ${video.guestName} ${(video.topics || []).join(' ')}`.toLowerCase();
-    return searchTerms.every(term => content.includes(term));
-  }).map(v => v.id);
-};
-
-// --- 2. AI MODAL FUNCTIONS (For Auto-Fill and Bulk Import) ---
+// --- 2. AI MODAL FUNCTIONS (Auto-Fill & Bulk Import) ---
 
 export const analyzeVideoContent = async (
   input: string, 
@@ -76,37 +89,40 @@ export const analyzeVideoContent = async (
 ): Promise<Partial<VideoEntry>> => {
   if (!genAI) throw new Error("Gemini API key is missing. Please check your .env.local file.");
   
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const schema: Schema = {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: { type: SchemaType.STRING },
+      headline: { type: SchemaType.STRING },
+      fullDescription: { type: SchemaType.STRING },
+      guestName: { type: SchemaType.STRING },
+      isShort: { type: SchemaType.STRING },
+      guestProfiles: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+      targetAudience: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+      topics: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+      youtubeId: { type: SchemaType.STRING }
+    },
+    required: ["title", "headline", "isShort"]
+  }; // 👈 Add "as const" here as const; // 👈 Add "as const" here
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+  });
+
   const prompt = `
-    You are an AI data assistant for "The Hire Ground Podcast". 
-    Analyze the following text/data and extract the details into a single JSON object.
+    Analyze this video data and extract the details.
     
-    Use these existing tags if they match contextually (otherwise you can create new ones):
+    Use these existing tags if they match contextually:
     - Profiles: ${availableProfiles?.join(', ') || 'None provided'}
     - Topics: ${availableTopics?.join(', ') || 'None provided'}
     - Audiences: ${availableAudiences?.join(', ') || 'None provided'}
 
-    Return ONLY a raw JSON object with these exact keys (do not use markdown blocks):
-    {
-      "title": "String",
-      "headline": "String",
-      "guestName": "String",
-      "guestProfiles": ["Array of Strings"],
-      "topics": ["Array of Strings"],
-      "targetAudience": ["Array of Strings"],
-      "youtubeId": "String (if found)",
-      "isShort": "Y or N"
-    }
-
-    Data to analyze:
+    Data:
     ${input}
   `;
 
-  const result = await model.generateContent(prompt);
-  const textResponse = result.response.text().trim();
-  const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
-  
-  return JSON.parse(cleanJson);
+  const response = await model.generateContent(prompt);
+  return JSON.parse(response.response.text());
 };
 
 export const parseBulkVideoInput = async (
@@ -117,37 +133,42 @@ export const parseBulkVideoInput = async (
 ): Promise<Partial<VideoEntry>[]> => {
   if (!genAI) throw new Error("Gemini API key is missing.");
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+ const schema: Schema = {
+    type: SchemaType.ARRAY,
+    items: {
+      type: SchemaType.OBJECT,
+      properties: {
+        title: { type: SchemaType.STRING },
+        headline: { type: SchemaType.STRING },
+        guestName: { type: SchemaType.STRING },
+        isShort: { type: SchemaType.STRING },
+        youtubeId: { type: SchemaType.STRING },
+        spotifyUrl: { type: SchemaType.STRING },
+        guestProfiles: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        targetAudience: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+        topics: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+      },
+      required: ["title"]
+    }
+  };// 👈 Add "as const" here
+
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+  });
+
   const prompt = `
-    You are an AI data assistant for "The Hire Ground Podcast". 
-    Analyze the following bulk data (like CSV or copy/pasted text) and extract it into a JSON array of multiple video objects.
+    Parse this list of podcast episodes/videos.
     
     Use these existing tags if they match contextually:
     - Profiles: ${availableProfiles?.join(', ') || 'None provided'}
     - Topics: ${availableTopics?.join(', ') || 'None provided'}
     - Audiences: ${availableAudiences?.join(', ') || 'None provided'}
 
-    Return ONLY a raw JSON array of objects with these exact keys (do not use markdown blocks):
-    [
-      {
-        "title": "String",
-        "headline": "String",
-        "guestName": "String",
-        "guestProfiles": ["Array of Strings"],
-        "topics": ["Array of Strings"],
-        "targetAudience": ["Array of Strings"],
-        "youtubeId": "String (if found)",
-        "isShort": "Y or N"
-      }
-    ]
-
-    Data to analyze:
+    Raw Text:
     ${input}
   `;
 
-  const result = await model.generateContent(prompt);
-  const textResponse = result.response.text().trim();
-  const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
-  
-  return JSON.parse(cleanJson);
+  const response = await model.generateContent(prompt);
+  return JSON.parse(response.response.text());
 };
