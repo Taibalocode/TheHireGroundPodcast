@@ -68,3 +68,89 @@ const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
     return searchTerms.every(term => content.includes(term));
   }).map(v => v.id);
 };
+
+// --- RESTORED AI MODAL FUNCTIONS (For Auto-Fill and Bulk Import) ---
+
+export const analyzeVideoContent = async (
+  input: string, 
+  availableProfiles?: string[], 
+  availableTopics?: string[], 
+  availableAudiences?: string[]
+): Promise<Partial<VideoEntry>> => {
+  if (!genAI) throw new Error("Gemini API key is missing. Please check your .env.local file.");
+  
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `
+    You are an AI data assistant for "The Hire Ground Podcast". 
+    Analyze the following text/data and extract the details into a single JSON object.
+    
+    Use these existing tags if they match contextually (otherwise you can create new ones):
+    - Profiles: ${availableProfiles?.join(', ') || 'None provided'}
+    - Topics: ${availableTopics?.join(', ') || 'None provided'}
+    - Audiences: ${availableAudiences?.join(', ') || 'None provided'}
+
+    Return ONLY a raw JSON object with these exact keys (do not use markdown blocks):
+    {
+      "title": "String",
+      "headline": "String",
+      "guestName": "String",
+      "guestProfiles": ["Array of Strings"],
+      "topics": ["Array of Strings"],
+      "targetAudience": ["Array of Strings"],
+      "youtubeId": "String (if found)",
+      "isShort": "Y or N"
+    }
+
+    Data to analyze:
+    ${input}
+  `;
+
+  const result = await model.generateContent(prompt);
+  const textResponse = result.response.text().trim();
+  const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+  
+  return JSON.parse(cleanJson);
+};
+
+export const parseBulkVideoInput = async (
+  input: string,
+  availableProfiles?: string[],
+  availableTopics?: string[],
+  availableAudiences?: string[]
+): Promise<Partial<VideoEntry>[]> => {
+  if (!genAI) throw new Error("Gemini API key is missing.");
+
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `
+    You are an AI data assistant for "The Hire Ground Podcast". 
+    Analyze the following bulk data (like CSV or copy/pasted text) and extract it into a JSON array of multiple video objects.
+    
+    Use these existing tags if they match contextually:
+    - Profiles: ${availableProfiles?.join(', ') || 'None provided'}
+    - Topics: ${availableTopics?.join(', ') || 'None provided'}
+    - Audiences: ${availableAudiences?.join(', ') || 'None provided'}
+
+    Return ONLY a raw JSON array of objects with these exact keys (do not use markdown blocks):
+    [
+      {
+        "title": "String",
+        "headline": "String",
+        "guestName": "String",
+        "guestProfiles": ["Array of Strings"],
+        "topics": ["Array of Strings"],
+        "targetAudience": ["Array of Strings"],
+        "youtubeId": "String (if found)",
+        "isShort": "Y or N"
+      }
+    ]
+
+    Data to analyze:
+    ${input}
+  `;
+
+  const result = await model.generateContent(prompt);
+  const textResponse = result.response.text().trim();
+  const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+  
+  return JSON.parse(cleanJson);
+};
