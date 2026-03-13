@@ -149,7 +149,43 @@ const downloadVideosAsJson = () => {
     link.download = `hire_ground_db_backup_${new Date().toISOString().slice(0,10)}.json`;
     link.click();
   };
+  const cleanUpDuplicates = async () => {
+    if (!window.confirm("Ready to hunt down and delete duplicate videos?")) return;
+    
+    setIsLoading(true);
+    try {
+        const allVideos = await videoStorage.getAll();
+        const seenYoutubeIds = new Set();
+        const duplicateDbIds: string[] = [];
 
+        // 1. Find the duplicates
+        for (const video of allVideos) {
+            // We use youtubeId to check for duplicates, since those should be unique
+            const identifier = video.youtubeId || video.title; 
+            
+            if (seenYoutubeIds.has(identifier)) {
+                duplicateDbIds.push(video.id); // This is a copy! Mark for deletion.
+            } else {
+                seenYoutubeIds.add(identifier); // First time seeing this one, keep it.
+            }
+        }
+
+        // 2. Delete them from Firestore
+        console.log(`Found ${duplicateDbIds.length} duplicates. Deleting...`);
+        for (const id of duplicateDbIds) {
+            await videoStorage.delete(id);
+        }
+
+        alert(`Successfully deleted ${duplicateDbIds.length} duplicate videos!`);
+        
+        // 3. Refresh the page to load the clean data
+        window.location.reload();
+    } catch (error) {
+        console.error("Failed to clean duplicates:", error);
+        alert("Something went wrong. Check the console.");
+        setIsLoading(false);
+    }
+  };
   const downloadVideosAsCsv = () => {
     if (videos.length === 0) return;
     const headers = [
@@ -406,6 +442,14 @@ const downloadVideosAsJson = () => {
                     
                     <div className="h-px bg-gray-100 my-1"></div>
                     
+                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
+
+{/* ADD THIS TEMPORARY BUTTON */}
+<button onClick={() => { cleanUpDuplicates(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-2 font-bold">
+    🧹 Run Magic Eraser
+</button>
+
+<button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><UploadCloud size={14} className="text-green-600" /> Publish Updates</button>
                     {/* Logs Section */}
                     <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
                     <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
