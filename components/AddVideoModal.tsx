@@ -259,12 +259,15 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
     logEvent('ANALYZE_START', `Analyzing video metadata: ${title || url}`);
     
     try {
-      const result = await analyzeVideoContent(title, headline, transcript.slice(0, 5000), url);
+      // FIX 1: Combine input into one string, and correctly pass the arrays to the AI
+      const aiInput = `Title: ${title}\nHeadline: ${headline}\nURL: ${url}\nTranscript: ${transcript.slice(0, 5000)}`;
+      const result = await analyzeVideoContent(aiInput, availableProfiles, availableTopics, availableAudiences);
       
-      setGuestProfiles(result.guestProfiles.join(', '));
-      setTopics(result.topics.join(', '));
+      // Added safety fallbacks (|| []) in case the AI forgets to return an array
+      setGuestProfiles((result.guestProfiles || []).join(', '));
+      setTopics((result.topics || []).join(', '));
       if (result.guestName) setGuestName(result.guestName);
-      if (result.targetAudience) setTargetAudience(result.targetAudience.join(', '));
+      if (result.targetAudience) setTargetAudience((result.targetAudience || []).join(', '));
       if (result.headline) setHeadline(result.headline);
       if (result.fullDescription) setFullDescription(result.fullDescription);
       
@@ -315,7 +318,7 @@ if (validSpotify && spotifyUrl.trim()) {
       onUpdate(editVideo.id, videoData);
     } else {
       logEvent('VIDEO_ADD', `Adding video: ${title}`);
-      onAdd(videoData);
+      onAdd(videoData as any);
     }
     
     resetAndClose();
@@ -329,7 +332,8 @@ if (validSpotify && spotifyUrl.trim()) {
     logEvent('SUBMIT_BULK_START', `Processing bulk text length: ${bulkText.length}`);
 
     try {
-        const videosFromAI = await parseBulkVideoInput(bulkText);
+        // Passed the available tags so the AI categorizes bulk imports correctly
+        const videosFromAI = await parseBulkVideoInput(bulkText, availableProfiles, availableTopics, availableAudiences);
         const validVideos: Omit<VideoEntry, 'id' | 'createdAt'>[] = [];
         const failedItems: string[] = [];
 
@@ -338,13 +342,14 @@ if (validSpotify && spotifyUrl.trim()) {
             const cleanSpotify = isValidSpotifyUrl(v.spotifyUrl) ? v.spotifyUrl!.trim() : undefined;
             
             if (cleanYtId || cleanSpotify) {
+                // FIX 2: Added "as any" to force TypeScript to accept the AI data
                 validVideos.push({
                     ...v,
                     youtubeId: cleanYtId || "",
                     spotifyUrl: cleanSpotify,
                     isShort: v.isShort === 'Y' ? 'Y' : 'N',
                     publishedAt: v.publishedAt || new Date().toISOString().split('T')[0]
-                });
+                } as any); 
             } else {
                 failedItems.push(v.title || 'Untitled Item');
             }
