@@ -25,21 +25,21 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
     }));
 
     const prompt = `
-      You are an expert podcast librarian for "The Hire Ground".
-      A user typed this natural language search: "${query}"
+      You are the intelligent search engine for "The Hire Ground" podcast.
+      User Query: "${query}"
       
-      STEP 1: Ignore conversational filler words (e.g., "videos about", "show me", "find episodes on", "I want to watch"). Extract only the CORE CONCEPT (e.g., "interviews", "tech jobs", "resume building").
-      
-      STEP 2: Analyze the following JSON catalog of episodes:
+      Catalog:
       ${JSON.stringify(lightweightCatalog)}
       
-      STEP 3: Find ALL episodes that conceptually match the user's core concept. Match by topics, targetAudience, title, headline, or guest profile. 
-      * Be generous! If a video is conceptually related to the core topic, include it.
-      * Do NOT require exact word matches. Use your semantic understanding.
+      Instructions:
+      1. Determine the user's underlying intent. Ignore conversational filler like "videos about", "show me", "episodes on", or "I want to watch".
+      2. Find every video in the catalog that is conceptually relevant to what they are asking for.
+      3. Look at titles, descriptions, topics, and audiences. Connect the dots (e.g., a search for "getting hired" should match videos tagged with "Job Hunt" or "Interviewing").
+      4. Be highly generous. If a video is even partially relevant to the user's core topic, include it.
       
-      CRITICAL INSTRUCTION: You must return ONLY a raw JSON array of the exact string 'id's for the matching videos. Do not include markdown formatting, backticks (\`\`\`), or any conversational text.
-      Example of valid output: ["id1", "id2"]
-      If absolutely no videos match the core concept, return an empty array: []
+      Output strictly a raw JSON array of the matching video IDs. No markdown, no backticks, no explanations.
+      Example: ["id1", "id2"]
+      If nothing matches, return []
     `;
 
     const result = await model.generateContent(prompt);
