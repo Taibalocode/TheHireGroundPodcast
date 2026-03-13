@@ -5,50 +5,48 @@ import { VideoEntry } from '../types';
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
+// --- 1. AI SEMANTIC SEARCH BAR ---
 export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): Promise<string[]> => {
-  // 1. Fallback if the API key isn't set up correctly
   if (!genAI) {
     console.warn("⚠️ No VITE_GEMINI_API_KEY found. Falling back to basic text search.");
     return fallbackTextSearch(query, videos);
   }
 
   try {
-    // 2. Load the ultra-fast Gemini 1.5 Flash model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // 3. Create a lightweight catalog so we don't send massive transcripts (saves tokens/money)
     const lightweightCatalog = videos.map(v => ({
       id: v.id,
       title: v.title,
       guest: v.guestName,
       topics: v.topics,
       audience: v.targetAudience,
-      description: v.headline // Using headline instead of fullDescription to save space
+      description: v.headline 
     }));
 
-    // 4. Give the AI strict instructions
     const prompt = `
-      You are an intelligent search assistant for a podcast directory called "The Hire Ground".
-      A user is searching for: "${query}"
+      You are an expert podcast librarian for "The Hire Ground".
+      A user typed this natural language search: "${query}"
       
-      Here is the JSON catalog of available podcast episodes:
+      STEP 1: Ignore conversational filler words (e.g., "videos about", "show me", "find episodes on", "I want to watch"). Extract only the CORE CONCEPT (e.g., "interviews", "tech jobs", "resume building").
+      
+      STEP 2: Analyze the following JSON catalog of episodes:
       ${JSON.stringify(lightweightCatalog)}
       
-      Analyze the search query and find the episodes that best match the user's intent. They might use synonyms, concepts, or specific names.
+      STEP 3: Find ALL episodes that conceptually match the user's core concept. Match by topics, targetAudience, title, headline, or guest profile. 
+      * Be generous! If a video is conceptually related to the core topic, include it.
+      * Do NOT require exact word matches. Use your semantic understanding.
       
       CRITICAL INSTRUCTION: You must return ONLY a raw JSON array of the exact string 'id's for the matching videos. Do not include markdown formatting, backticks (\`\`\`), or any conversational text.
       Example of valid output: ["id1", "id2"]
-      If no videos match, return an empty array: []
+      If absolutely no videos match the core concept, return an empty array: []
     `;
 
-    // 5. Ask Gemini!
     const result = await model.generateContent(prompt);
     const textResponse = result.response.text().trim();
     
-    // 6. Clean up the response just in case the AI wraps it in markdown (```json ... ```)
     const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
     
-    // Parse the JSON array of IDs and return it to App.tsx
     const matchedIds: string[] = JSON.parse(cleanJson);
     console.log(`🧠 AI Search complete. Found ${matchedIds.length} matches.`);
     
@@ -60,7 +58,6 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
   }
 };
 
-// Helper function for the basic text search fallback
 const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
   const searchTerms = query.toLowerCase().split(' ');
   return videos.filter(video => {
@@ -69,7 +66,7 @@ const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
   }).map(v => v.id);
 };
 
-// --- RESTORED AI MODAL FUNCTIONS (For Auto-Fill and Bulk Import) ---
+// --- 2. AI MODAL FUNCTIONS (For Auto-Fill and Bulk Import) ---
 
 export const analyzeVideoContent = async (
   input: string, 

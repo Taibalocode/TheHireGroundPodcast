@@ -53,18 +53,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       </div>
 
       <div className="p-4 overflow-y-auto flex-grow space-y-8">
-        <div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search episodes..." 
-              value={filterState.searchQuery}
-              onChange={(e) => setFilterState(prev => ({...prev, searchQuery: e.target.value}))}
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 outline-none text-sm transition-all bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-        </div>
+       
 
         <div>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Video Type</h3>
