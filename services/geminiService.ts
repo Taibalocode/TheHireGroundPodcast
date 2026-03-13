@@ -1,4 +1,4 @@
-\import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { VideoEntry } from '../types';
 
 // Initialize the Gemini AI client using the VITE_ prefixed environment variable
