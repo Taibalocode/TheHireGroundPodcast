@@ -15,6 +15,7 @@ const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
 };
 
 // --- 1. AI SEMANTIC SEARCH BAR ---
+// --- 1. AI SEMANTIC SEARCH BAR ---
 export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): Promise<string[]> => {
   if (!genAI) {
     console.warn("⚠️ No VITE_GEMINI_API_KEY found. Falling back to basic text search.");
@@ -22,6 +23,7 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
   }
 
   try {
+    // EXACT AI STUDIO CATALOG MAPPING
     const catalog = videos.map(v => ({
       id: v.id,
       title: v.title,
@@ -43,15 +45,14 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
           description: "List of video IDs that best match the user's intent.",
         },
       },
-      required: ["relevantVideoIds"]
     };
 
+    // SWITCHED TO 'PRO' MODEL FOR DEEPER SEMANTIC REASONING
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-pro", 
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        temperature: 0.1,
       }
     });
 
