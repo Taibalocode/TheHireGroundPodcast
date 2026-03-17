@@ -15,7 +15,6 @@ const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
 };
 
 // --- 1. AI SEMANTIC SEARCH BAR ---
-// --- 1. AI SEMANTIC SEARCH BAR ---
 export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): Promise<string[]> => {
   if (!genAI) {
     console.warn("⚠️ No VITE_GEMINI_API_KEY found. Falling back to basic text search.");
@@ -23,7 +22,6 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
   }
 
   try {
-    // EXACT AI STUDIO CATALOG MAPPING
     const catalog = videos.map(v => ({
       id: v.id,
       title: v.title,
@@ -35,7 +33,6 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       topics: v.topics.join(', ')
     }));
 
-    // EXACT AI STUDIO SCHEMA
     const schema: Schema = {
       type: SchemaType.OBJECT,
       properties: {
@@ -47,16 +44,16 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       },
     };
 
-    // SWITCHED TO 'PRO' MODEL FOR DEEPER SEMANTIC REASONING
+    // EXACT MODEL FROM YOUR AI STUDIO CODE
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro", 
+      model: "gemini-3-pro-preview", 
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: schema,
       }
     });
 
-    // EXACT AI STUDIO PROMPT
+    // EXACT PROMPT FROM YOUR AI STUDIO CODE
     const prompt = `
       User Query: "${query}"
 
@@ -79,7 +76,6 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
     return fallbackTextSearch(query, videos);
   }
 };
-
 // --- 2. AI MODAL FUNCTIONS (Auto-Fill & Bulk Import) ---
 
 export const analyzeVideoContent = async (
@@ -94,17 +90,18 @@ export const analyzeVideoContent = async (
     type: SchemaType.OBJECT,
     properties: {
       title: { type: SchemaType.STRING },
-      headline: { type: SchemaType.STRING },
+      headline: { type: SchemaType.STRING, description: "A short, catchy 1-sentence summary" },
       fullDescription: { type: SchemaType.STRING },
       guestName: { type: SchemaType.STRING },
-      isShort: { type: SchemaType.STRING },
+      isShort: { type: SchemaType.STRING, description: "Y or N" },
       guestProfiles: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
       targetAudience: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
       topics: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
       youtubeId: { type: SchemaType.STRING }
     },
     required: ["title", "headline", "isShort"]
-  }; // 👈 Add "as const" here as const; // 👈 Add "as const" here
+  };
+
   const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
     generationConfig: { responseMimeType: "application/json", responseSchema: schema }
@@ -134,7 +131,7 @@ export const parseBulkVideoInput = async (
 ): Promise<Partial<VideoEntry>[]> => {
   if (!genAI) throw new Error("Gemini API key is missing.");
 
- const schema: Schema = {
+  const schema: Schema = {
     type: SchemaType.ARRAY,
     items: {
       type: SchemaType.OBJECT,
@@ -151,7 +148,7 @@ export const parseBulkVideoInput = async (
       },
       required: ["title"]
     }
-  };// 👈 Add "as const" here
+  };
 
   const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
