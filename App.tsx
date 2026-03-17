@@ -513,6 +513,7 @@ const downloadVideosAsJson = () => {
           isOpen={isModalOpen}
           onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
           editVideo={editingVideo}
+          existingVideos={videos}
           availableProfiles={allProfiles}
           availableTopics={allTopics}
           availableAudiences={allAudiences}

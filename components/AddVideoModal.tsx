@@ -12,6 +12,7 @@ interface AddVideoModalProps {
   onAdd: (video: Omit<VideoEntry, 'id' | 'createdAt'>) => void;
   onUpdate: (id: string, updates: Partial<VideoEntry>) => void;
   onDelete: (id: string) => void;
+  existingVideos: VideoEntry[];
   editVideo: VideoEntry | null;
   availableProfiles: string[];
   availableTopics: string[];
@@ -153,7 +154,7 @@ const MultiSelectInput = ({
 };
 
 export const AddVideoModal: React.FC<AddVideoModalProps> = ({ 
-  isOpen, onClose, onAdd, onUpdate, onDelete, editVideo, 
+  isOpen, onClose, onAdd, onUpdate, onDelete, editVideo, existingVideos,
   availableProfiles, availableTopics, availableAudiences 
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('single');
@@ -395,108 +396,114 @@ if (validSpotify && spotifyUrl.trim()) {
     e.target.value = ''; 
   };
 
-  const processCsv = (csvText: string) => {
+  const processCsv = async (csvText: string) => {
+    setIsLoading(true);
+    setError("");
+    setSuccessMsg("");
+
     try {
-      const rows: string[][] = [];
-      let currentRow: string[] = [];
-      let currentField = '';
-      let inQuote = false;
+      // 1. Split text into rows and ignore empty lines
+      const rows = csvText.split('\n').filter(row => row.trim() !== '');
+      if (rows.length < 2) throw new Error("CSV file must contain headers and at least one row of data.");
 
-      for (let i = 0; i < csvText.length; i++) {
-        const char = csvText[i];
-        const nextChar = csvText[i + 1];
-        if (char === '"') {
-          if (inQuote && nextChar === '"') {
-            currentField += '"';
-            i++; 
-          } else {
-            inQuote = !inQuote;
-          }
-        } else if (char === ',' && !inQuote) {
-          currentRow.push(currentField.trim());
-          currentField = '';
-        } else if ((char === '\r' || char === '\n') && !inQuote) {
-          if (char === '\r' && nextChar === '\n') i++;
-          currentRow.push(currentField.trim());
-          if (currentRow.length > 0 && currentRow.some(c => c !== '')) rows.push(currentRow);
-          currentRow = [];
-          currentField = '';
-        } else {
-          currentField += char;
+      // 2. Safe Row Parser (Ignores commas inside of quotation marks)
+      const parseRow = (row: string) => {
+        const regex = /(?:"([^"]*(?:""[^"]*)*)"|([^,]+))/g;
+        let matches;
+        const cols: string[] = [];
+        while ((matches = regex.exec(row)) !== null) {
+          let val = matches[1] || matches[2] || '';
+          cols.push(val.replace(/""/g, '"').trim());
         }
-      }
-      
-      if (currentField || currentRow.length > 0) {
-         currentRow.push(currentField.trim());
-         if (currentRow.some(c => c !== '')) rows.push(currentRow);
-      }
-
-      const headers = rows[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-      
-      const findIdx = (...keys: string[]) => {
-        for (const k of keys) {
-            const idx = headers.indexOf(k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-            if (idx !== -1) return idx;
-        }
-        return -1;
+        return cols;
       };
 
-      const youtubeIdx = findIdx('youtubeid', 'url');
-      const titleIdx = findIdx('title');
-      const headlineIdx = findIdx('headline');
-      const fullDescIdx = findIdx('fulldescription', 'description');
-      const guestIdx = findIdx('guestname', 'guest');
-      const profilesIdx = findIdx('profiles', 'guestprofiles');
-      const audienceIdx = findIdx('targetaudience', 'audience');
-      const topicsIdx = findIdx('topics');
-      const transcriptIdx = findIdx('transcript');
-      const dateIdx = findIdx('publisheddate', 'date', 'publishedat');
-      const shortsIdx = findIdx('isshort', 'shorts');
-      const spotifyIdx = findIdx('spotifyurl', 'spotify');
+      // 3. Map the column headers so the order doesn't matter
+      const headers = parseRow(rows[0]).map(h => h.toLowerCase());
+      const getIdx = (aliases: string[]) => headers.findIndex(h => aliases.some(a => h.includes(a)));
+      
+      const titleIdx = getIdx(['title']);
+      const ytIdx = getIdx(['youtubeid', 'youtube']);
+      const spotIdx = getIdx(['spotifyurl', 'spotify']);
+      const headlineIdx = getIdx(['headline']);
+      const fullDescIdx = getIdx(['fulldescription', 'description']);
+      const guestIdx = getIdx(['guestname', 'guest']);
+      const profilesIdx = getIdx(['guestprofiles', 'profiles']);
+      const audienceIdx = getIdx(['targetaudience', 'audience']);
+      const topicsIdx = getIdx(['topics']);
+      const transcriptIdx = getIdx(['transcript']);
+      const dateIdx = getIdx(['publisheddate', 'date']);
+      const shortsIdx = getIdx(['isshort', 'short']);
+
+      if (titleIdx === -1) {
+        throw new Error("CSV must have at least a 'Title' column.");
+      }
 
       let addedCount = 0;
       let skippedCount = 0;
 
+      // 4. Loop through the data rows
       for (let i = 1; i < rows.length; i++) {
-        const values = rows[i];
-        const getVal = (idx: number) => (idx !== -1 && idx < values.length) ? values[idx] : '';
+        const cols = parseRow(rows[i]);
+        const getVal = (idx: number) => idx >= 0 && cols[idx] ? cols[idx] : "";
         
-        const urlRaw = getVal(youtubeIdx);
-        const youtubeId = extractYoutubeId(urlRaw);
-        const spotifyRaw = getVal(spotifyIdx);
-        const spotifyUrl = isValidSpotifyUrl(spotifyRaw) ? spotifyRaw : undefined;
         const titleVal = getVal(titleIdx);
+        const youtubeId = getVal(ytIdx);
+        const spotifyUrl = getVal(spotIdx);
 
-        if (titleVal && (youtubeId || spotifyUrl)) {
-          const video: Omit<VideoEntry, 'id' | 'createdAt'> = {
-            youtubeId: youtubeId || "",
-            title: titleVal,
-            headline: getVal(headlineIdx),
-            fullDescription: getVal(fullDescIdx),
-            guestName: getVal(guestIdx),
-            publishedAt: getVal(dateIdx) || new Date().toISOString().split('T')[0],
-            guestProfiles: normalizeTags(getVal(profilesIdx).split(',').map(s => s.trim()).filter(s => s)),
-            topics: normalizeTags(getVal(topicsIdx).split(',').map(s => s.trim()).filter(s => s)),
-            targetAudience: normalizeTags(getVal(audienceIdx).split(',').map(s => s.trim()).filter(s => s)),
-            transcript: getVal(transcriptIdx),
-            spotifyUrl: spotifyUrl,
-            isShort: getVal(shortsIdx).toUpperCase() === 'Y' ? 'Y' : 'N'
-          };
-          onAdd(video);
-          addedCount++;
-        } else {
-            skippedCount++;
+        if (!titleVal) continue; // Skip completely empty rows
+
+        // 🛑 THE GATEKEEPER: DUPLICATE CHECKER
+        const isDuplicate = existingVideos.some(v => 
+          (youtubeId && v.youtubeId === youtubeId) || 
+          (spotifyUrl && v.spotifyUrl === spotifyUrl) ||
+          (v.title.toLowerCase() === titleVal.toLowerCase())
+        );
+
+        if (isDuplicate) {
+          skippedCount++; // It exists! Skip it.
+          continue; 
         }
+
+        // 5. Build the new video object
+        // (Checks if array items are separated by commas or semicolons)
+        const profileStr = getVal(profilesIdx);
+        const splitChar = profileStr.includes(';') ? ';' : ',';
+
+        const newVideo: Omit<VideoEntry, 'id' | 'createdAt'> = {
+          title: titleVal,
+          youtubeId: youtubeId,
+          spotifyUrl: spotifyUrl,
+          headline: getVal(headlineIdx),
+          fullDescription: getVal(fullDescIdx),
+          guestName: getVal(guestIdx),
+          publishedAt: getVal(dateIdx) || new Date().toISOString().split('T')[0],
+          guestProfiles: profileStr.split(splitChar).map(s => s.trim()).filter(Boolean),
+          topics: getVal(topicsIdx).split(splitChar).map(s => s.trim()).filter(Boolean),
+          targetAudience: getVal(audienceIdx).split(splitChar).map(s => s.trim()).filter(Boolean),
+          transcript: getVal(transcriptIdx),
+          isShort: getVal(shortsIdx).toUpperCase() === 'Y' ? 'Y' : 'N'
+        };
+
+        // 6. Save it to the database!
+        await onAdd(newVideo); 
+        addedCount++;
       }
 
-      if (addedCount > 0) {
-        setSuccessMsg(`Imported ${addedCount} videos.`);
-        setTimeout(onClose, 2000);
+      // 7. Show the final results
+      if (addedCount > 0 || skippedCount > 0) {
+        setSuccessMsg(`Import complete! Added ${addedCount} new videos. (Skipped ${skippedCount} duplicates).`);
+        if (addedCount > 0) {
+          setTimeout(() => onClose(), 3000); // Close modal automatically after 3 seconds
+        }
       } else {
-        setError("No valid videos found in CSV.");
+        setError("No new videos found to import. All rows were duplicates or invalid.");
       }
-    } catch (err) {
-      setError("Failed to parse CSV file.");
+
+    } catch (err: any) {
+      setError(err.message || "Failed to parse CSV file. Please check the formatting.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -697,3 +704,7 @@ if (validSpotify && spotifyUrl.trim()) {
     </div>
   );
 };
+
+function setIsLoading(arg0: boolean) {
+  throw new Error('Function not implemented.');
+}
