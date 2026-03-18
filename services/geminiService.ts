@@ -17,12 +17,12 @@ const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
 // --- 1. AI SEMANTIC SEARCH BAR ---
 export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): Promise<string[]> => {
   if (!genAI) {
-    console.warn("⚠️ No VITE_GEMINI_API_KEY found. Falling back to basic text search.");
+    console.warn("⚠️ No API Key found! Forcing basic text search.");
     return fallbackTextSearch(query, videos);
   }
 
   try {
-    const catalog = videos.map(v => ({
+    const catalogData = JSON.stringify(videos.map(v => ({
       id: v.id,
       title: v.title,
       headline: v.headline,
@@ -31,9 +31,14 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       profiles: v.guestProfiles.join(', '),
       audience: v.targetAudience.join(', '),
       topics: v.topics.join(', ')
-    }));
+    })));
 
-    const schema: Schema = {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-pro-preview", 
+    });
+
+    // 1. EXPLICITLY TYPE THE SCHEMA TO SATISFY TYPESCRIPT
+    const responseSchema: Schema = {
       type: SchemaType.OBJECT,
       properties: {
         relevantVideoIds: {
@@ -44,17 +49,17 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       },
     };
 
-    // EXACT MODEL FROM YOUR AI STUDIO CODE
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-3-pro-preview", 
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      }
-    });
+    // 2. PASS THE TYPED SCHEMA INTO THE CONFIG
+    const generationConfig = {
+      temperature: 0.4,
+      topP: 0.95,
+      topK: 64,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+      responseSchema: responseSchema,
+    };
 
-    // EXACT PROMPT FROM YOUR AI STUDIO CODE
-    const prompt = `
+    const exactPrompt = `
       User Query: "${query}"
 
       You are a helpful assistant for a career advice video directory.
@@ -62,17 +67,21 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       Return ONLY the IDs of relevant videos.
 
       Catalog:
-      ${JSON.stringify(catalog)}
+      ${catalogData}
     `;
 
-    const response = await model.generateContent(prompt);
-    const result = JSON.parse(response.response.text() || "{}");
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: exactPrompt }] }],
+      generationConfig,
+    });
+
+    const parsedResult = JSON.parse(result.response.text() || "{}");
+    console.log(`🧠 AI Studio Search complete. Found ${parsedResult.relevantVideoIds?.length || 0} matches.`);
     
-    console.log(`🧠 AI Search complete. Found ${result.relevantVideoIds?.length || 0} matches.`);
-    return result.relevantVideoIds || [];
+    return parsedResult.relevantVideoIds || [];
 
   } catch (error) {
-    console.error("AI Search Failed. Falling back to text search.", error);
+    console.error("🚨 AI Studio Code Crashed:", error);
     return fallbackTextSearch(query, videos);
   }
 };
