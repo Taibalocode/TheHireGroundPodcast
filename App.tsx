@@ -10,8 +10,9 @@ import { logEvent, getLogs, initLoggerSession, downloadLogsAsCsv, downloadLogsAs
 import { Documentation } from './components/Documentation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { TagManager } from './components/TagManager';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from './services/firebase';
 
-const ADMIN_PASSWORD = "Ta1Bal0gun!";
 const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,13 +50,21 @@ const App: React.FC = () => {
     fetchVideos();
   }, []);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
+    try {
+      // Quietly use the shared email, checking against the password you typed
+      // REPLACE this email with the exact one you just added in the Firebase Console
+      await signInWithEmailAndPassword(auth, 'admin@thehireground.com', passwordInput);
+      
       setIsAdminMode(true);
       setShowPasswordModal(false);
       setPasswordError(false);
-    } else { setPasswordError(true); }
+      setPasswordInput(''); // Clear the password from the input box
+    } catch (error) {
+      console.error("Login failed", error);
+      setPasswordError(true); 
+    }
   };
 
   const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort(), [videos]);
