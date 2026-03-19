@@ -307,140 +307,142 @@ const downloadVideosAsJson = () => {
   </div>
 
   {/* 2. CENTER: AI Search Bar */}
-  <div className="flex-1 flex items-center justify-center max-w-2xl">
+  {/* ADDED 'min-w-0' HERE: This forces the search bar to shrink on mobile instead of pushing the admin button off screen */}
+  <div className="flex-1 min-w-0 flex items-center justify-center max-w-2xl">
     <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-xl border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all overflow-hidden h-10 md:h-12 group">
         <div className="pl-3 text-gray-400 flex items-center justify-center shrink-0">
             {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={18} /> : <Sparkles className={`transition-colors ${aiResultIds ? "text-blue-600" : "text-gray-400 group-hover:text-blue-400"}`} size={18} />}
         </div>
         <input 
-    type="text" 
-    value={aiQuery}
-    onChange={(e) => {
-        const val = e.target.value;
-        setAiQuery(val);
-        // Instantly run standard text search as the user types
-        setFilterState(prev => ({ ...prev, searchQuery: val, aiSearchActive: false }));
-        setAiResultIds(null); // Clear previous AI results when they type something new
-    }}
-    placeholder="Ask AI about episodes..."
-    className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
-/>
+            type="text" 
+            value={aiQuery}
+            onChange={(e) => {
+                const val = e.target.value;
+                setAiQuery(val);
+                setFilterState(prev => ({ ...prev, searchQuery: val, aiSearchActive: false }));
+                setAiResultIds(null);
+            }}
+            placeholder="Ask AI about episodes..."
+            className="flex-1 px-3 h-full outline-none text-sm text-gray-700 placeholder-gray-400 min-w-0 bg-transparent"
+        />
         {aiResultIds && (
-            <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center bg-gray-50 transition-colors">
+            <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 flex items-center justify-center bg-gray-50 transition-colors shrink-0">
                 <X size={16} />
             </button>
         )}
-        <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm transition-colors whitespace-nowrap disabled:opacity-50">
+        <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm transition-colors whitespace-nowrap disabled:opacity-50 shrink-0">
             Search
         </button>
     </form>
   </div>
 
   {/* 3. RIGHT: Actions (View Toggles & Admin) */}
+  {/* 'shrink-0' here acts as a bodyguard, making sure this right section NEVER gets squished */}
   <div className="flex items-center gap-3 shrink-0">
-     {/* Standard Layout Toggles (Hidden on very small screens to make room for search) */}
-     {/* View Mode Selectors */}
-{view === 'directory' && (
-   <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
-       <button 
-           onClick={() => setViewMode('list')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="List View"
-       >
-           <List size={18} />
-       </button>
-       <button 
-           onClick={() => setViewMode('gallery')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="Gallery View"
-       >
-           <Layout size={18} />
-       </button>
-       <button 
-           onClick={() => setViewMode('detailed')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
-           title="Detailed View"
-       >
-           <Grid size={18} />
-       </button>
-   </div>
-)}
+     
+     {/* Standard Layout Toggles */}
+     {/* Your 'hidden sm:flex' is already perfect here. It completely removes these buttons on mobile. */}
+     {view === 'directory' && (
+       <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
+           <button 
+               onClick={() => setViewMode('list')} 
+               className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+               title="List View"
+           >
+               <List size={18} />
+           </button>
+           <button 
+               onClick={() => setViewMode('gallery')} 
+               className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+               title="Gallery View"
+           >
+               <Layout size={18} />
+           </button>
+           <button 
+               onClick={() => setViewMode('detailed')} 
+               className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+               title="Detailed View"
+           >
+               <Grid size={18} />
+           </button>
+       </div>
+    )}
      
      {/* Admin Controls */}
-{isAdminMode ? (
-  <div className="flex items-center gap-1 md:gap-2 relative">
-    {/* Dashboard Tabs */}
-    <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
-    <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
-    <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
-    
-    <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95">
-      <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
-    </button>
+    {isAdminMode ? (
+      <div className="flex items-center gap-1 md:gap-2 relative">
+        {/* Dashboard Tabs */}
+        <button onClick={() => setView('analytics')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : ''}`}><BarChart3 size={18} /></button>
+        <button onClick={() => setView('tags')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'tags' ? 'bg-blue-50 text-blue-600' : ''}`}><Tags size={18} /></button>
+        <button onClick={() => setView('docs')} className={`p-2 rounded-lg hover:bg-gray-100 text-gray-500 hidden lg:block transition-colors ${view === 'docs' ? 'bg-blue-50 text-blue-600' : ''}`}><BookOpen size={18} /></button>
+        
+        <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-4 md:py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95 shrink-0">
+          <Plus size={18} /> <span className="hidden md:inline text-sm font-bold">Add</span>
+        </button>
 
-    {/* Settings Dropdown */}
-<div className="relative flex items-center h-10">
-    <button 
-        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-        className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors ${isSettingsOpen ? 'bg-gray-100 text-blue-600' : ''}`}
-    >
-        <Settings size={20} />
-    </button>
-    
-    {isSettingsOpen && (
-        <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 animate-slideDown origin-top-right">
-                <div className="p-2 space-y-1">
-                    
-                    {/* System Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
-                    <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <UploadCloud size={14} className="text-green-600" /> Publish Updates
-                    </button>
-                    <button onClick={() => { handleResetApp(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
-                        <RefreshCcw size={14} className="text-red-600" /> Factory Reset
-                    </button>
-                    
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Data Export Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
-                    <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <Database size={14} className="text-blue-600" /> Export Videos (CSV)
-                    </button>
-                    <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileJson size={14} className="text-indigo-600" /> Backup Database (JSON)
-                    </button>
-                    
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Logs Section */}
-                    <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
-                    <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileSpreadsheet size={14} className="text-emerald-600" /> Activity Logs (CSV)
-                    </button>
-                    <button onClick={() => { downloadLogsAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                        <FileJson size={14} className="text-amber-600" /> Save Logs (logFile.json)
-                    </button>
+        {/* Settings Dropdown */}
+        <div className="relative flex items-center h-10 shrink-0">
+            <button 
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors ${isSettingsOpen ? 'bg-gray-100 text-blue-600' : ''}`}
+            >
+                <Settings size={20} />
+            </button>
+            
+            {isSettingsOpen && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 animate-slideDown origin-top-right">
+                        <div className="p-2 space-y-1">
+                            
+                            {/* System Section */}
+                            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
+                            <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                                <UploadCloud size={14} className="text-green-600" /> Publish Updates
+                            </button>
+                            <button onClick={() => { handleResetApp(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                                <RefreshCcw size={14} className="text-red-600" /> Factory Reset
+                            </button>
+                            
+                            <div className="h-px bg-gray-100 my-1"></div>
+                            
+                            {/* Data Export Section */}
+                            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
+                            <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                                <Database size={14} className="text-blue-600" /> Export Videos (CSV)
+                            </button>
+                            <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                                <FileJson size={14} className="text-indigo-600" /> Backup Database (JSON)
+                            </button>
+                            
+                            <div className="h-px bg-gray-100 my-1"></div>
+                            
+                            {/* Logs Section */}
+                            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</div>
+                            <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                                <FileSpreadsheet size={14} className="text-emerald-600" /> Activity Logs (CSV)
+                            </button>
+                            <button onClick={() => { downloadLogsAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
+                                <FileJson size={14} className="text-amber-600" /> Save Logs (logFile.json)
+                            </button>
 
-                    <div className="h-px bg-gray-100 my-1"></div>
-                    
-                    {/* Exit Admin */}
-                    <button onClick={() => { setIsAdminMode(false); setIsSettingsOpen(false); setView('directory'); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
-                      Exit Admin
-                      </button>
-                </div>
-            </div>
-        </>
+                            <div className="h-px bg-gray-100 my-1"></div>
+                            
+                            {/* Exit Admin */}
+                            <button onClick={() => { setIsAdminMode(false); setIsSettingsOpen(false); setView('directory'); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
+                              Exit Admin
+                              </button>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+      </div>
+    ) : (
+      <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors shrink-0">
+        <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
+      </button>
     )}
-</div>
-  </div>
-) : (
-  <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5 transition-colors">
-    <Lock size={18} /> <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span>
-  </button>
-)}
   </div>
 </header>
 
