@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ENV VITE_GEMINI_API_KEY="AIzaSyB5_G_T5Mk7W6J33ZbOZVMQbXjWVOP4ncE"
 RUN npm run build
 
 # Stage 2: Serve

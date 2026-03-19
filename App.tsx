@@ -344,21 +344,21 @@ const downloadVideosAsJson = () => {
    <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 overflow-hidden shadow-sm h-10">
        <button 
            onClick={() => setViewMode('list')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
            title="List View"
        >
            <List size={18} />
        </button>
        <button 
            onClick={() => setViewMode('gallery')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'gallery' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
            title="Gallery View"
        >
            <Layout size={18} />
        </button>
        <button 
            onClick={() => setViewMode('detailed')} 
-           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
+           className={`px-3 h-full flex items-center justify-center transition-all ${viewMode === 'detailed' ? 'bg-amber-100 text-amber-400 font-bold' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`} 
            title="Detailed View"
        >
            <Grid size={18} />
