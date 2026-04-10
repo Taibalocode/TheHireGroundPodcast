@@ -2,8 +2,7 @@ import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai';
 import { VideoEntry } from '../types';
 
 // Initialize the Gemini AI client using the VITE_ prefixed environment variable
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 // Helper function for the basic text search fallback
 const fallbackTextSearch = (query: string, videos: VideoEntry[]): string[] => {
@@ -33,10 +32,8 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
       topics: v.topics.join(', ')
     })));
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest", 
-    });
-
+    
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     // 1. EXPLICITLY TYPE THE SCHEMA TO SATISFY TYPESCRIPT
     const responseSchema: Schema = {
       type: SchemaType.OBJECT,
@@ -112,7 +109,7 @@ export const analyzeVideoContent = async (
   };
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     generationConfig: { responseMimeType: "application/json", responseSchema: schema }
   });
 
@@ -160,7 +157,7 @@ export const parseBulkVideoInput = async (
   };
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     generationConfig: { responseMimeType: "application/json", responseSchema: schema }
   });
 
