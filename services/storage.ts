@@ -1,12 +1,13 @@
 import { collection, getDocs, setDoc, updateDoc, deleteDoc, doc, query, orderBy, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 import { VideoEntry } from '../types';
-import { MASTER_SEED_DATA } from '../seedData'; // Ensure this matches your seed file path
+import { MASTER_SEED_DATA } from '../seedData';
 
 const COLLECTION_NAME = "videos";
+const LOGS_COLLECTION = "activity_logs"; // The home for your permanent logs
 
 export const videoStorage = {
-  // 1. Fetch all videos from Firestore ordered by creation date
+  // --- 1. VIDEO MANAGEMENT ---
   getAll: async (): Promise<VideoEntry[]> => {
     try {
       const vidsRef = collection(db, COLLECTION_NAME);
@@ -22,57 +23,40 @@ export const videoStorage = {
     }
   },
 
-  // 2. App.tsx expects this on initial load to know where data came from
   syncWithCloud: async (): Promise<{ videos: VideoEntry[], source: 'cloud' | 'local' }> => {
     const videos = await videoStorage.getAll();
     return { videos, source: 'cloud' };
   },
 
-  // 3. Add a new video to Firestore & return the updated list
   add: async (video: VideoEntry): Promise<VideoEntry[]> => {
-    // We use setDoc instead of addDoc so the Firestore ID matches the crypto.randomUUID() generated in App.tsx
     const docRef = doc(db, COLLECTION_NAME, video.id);
     await setDoc(docRef, { ...video });
-    
-    // Return the fresh list so the UI updates
     return await videoStorage.getAll();
   },
 
-  // 4. Update an existing video in Firestore & return the updated list
   update: async (id: string, updates: Partial<VideoEntry>): Promise<VideoEntry[]> => {
     const docRef = doc(db, COLLECTION_NAME, id);
     await updateDoc(docRef, updates);
-    
     return await videoStorage.getAll();
   },
 
-  // 5. Delete a video from Firestore & return the updated list
   delete: async (id: string): Promise<VideoEntry[]> => {
     await deleteDoc(doc(db, COLLECTION_NAME, id));
-    
     return await videoStorage.getAll();
   },
 
-  // 6. The Factory Reset (Wipes Cloud Database and Restores Seed Data)
   reset: async (): Promise<void> => {
     try {
-      // Step A: Get all current documents
       const vidsRef = collection(db, COLLECTION_NAME);
       const querySnapshot = await getDocs(vidsRef);
-      
-      // Step B: Initialize a Firestore Batch (allows us to do massive read/writes at exactly the same time)
       const batch = writeBatch(db);
       
-      // Step C: Stage all current documents for deletion
       querySnapshot.forEach((document) => {
         batch.delete(doc(db, COLLECTION_NAME, document.id));
       });
       
-      // Step D: Stage all original seed documents for insertion
       if (MASTER_SEED_DATA && MASTER_SEED_DATA.videos) {
-        // Tell TypeScript to safely treat the imported JSON as VideoEntry objects
         const seedVideos = MASTER_SEED_DATA.videos as any[];
-        
         seedVideos.forEach((videoItem) => {
           const video = videoItem as VideoEntry;
           const docRef = doc(db, COLLECTION_NAME, video.id);
@@ -80,7 +64,6 @@ export const videoStorage = {
         });
       }
       
-      // Step E: Execute the wipe and restore simultaneously!
       await batch.commit();
       console.log("Firestore successfully reset to seed data.");
     } catch (error) {
@@ -89,15 +72,40 @@ export const videoStorage = {
     }
   },
 
-  // 7. Fallback Text Search (Used if Gemini AI fails)
   searchWithAI: async (query: string): Promise<VideoEntry[]> => {
     const allVideos = await videoStorage.getAll();
-    
     const searchTerms = query.toLowerCase().split(' ');
-    
     return allVideos.filter(video => {
       const content = `${video.title} ${video.headline} ${video.guestName} ${video.topics.join(' ')}`.toLowerCase();
       return searchTerms.every(term => content.includes(term));
     });
+  },
+
+  // --- 2. PERMANENT ACTIVITY LOGGING ---
+  
+  // This pushes a log entry to the cloud so you don't lose it on refresh
+  saveLog: async (log: any) => {
+    try {
+      // Use crypto.randomUUID() so each log has a unique ID in Firestore
+      const docRef = doc(db, LOGS_COLLECTION, crypto.randomUUID());
+      await setDoc(docRef, log);
+    } catch (e) {
+      console.error("Cloud Logger Error:", e);
+    }
+  },
+
+  // This pulls the full history back down when the app loads
+  getAllLogs: async (): Promise<any[]> => {
+    try {
+      const q = query(
+        collection(db, LOGS_COLLECTION), 
+        orderBy("timestamp", "desc") // This ensures newest actions appear at the top
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data());
+    } catch (e) {
+      console.error("Failed to pull cloud logs:", e);
+      return [];
+    }
   }
 };
