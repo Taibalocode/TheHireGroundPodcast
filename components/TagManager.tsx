@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VideoEntry } from '../types';
 import { Tag, Users, Briefcase, Edit2, Trash2, ChevronRight, ChevronDown, Save, X, AlertCircle, Check, ArrowUpDown, ArrowUpAZ, Hash, Plus, Search } from 'lucide-react';
@@ -32,12 +31,16 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
   const [videoSearchQuery, setVideoSearchQuery] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
 
+  // NEW: Create Tag State
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagVideoSearch, setNewTagVideoSearch] = useState('');
+
   // 1. Aggregate and Sort Data
   const tagStats = useMemo(() => {
     const stats: Record<string, TagStat> = {};
 
     videos.forEach(video => {
-      // All categories are now string arrays, no special case needed
       const tags = (video[activeCategory] as string[]) || [];
 
       tags.forEach(tag => {
@@ -76,7 +79,6 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAddPopup]);
 
-  // If a tag is expanded and it no longer exists after an update, collapse it
   useEffect(() => {
     if (expandedTag && !tagStats.some(t => t.name === expandedTag)) {
         setExpandedTag(null);
@@ -167,6 +169,28 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
     setShowAddPopup(false);
   };
 
+  // NEW: Function to handle creating a completely new tag
+  const handleCreateNewTag = (videoId: string) => {
+    if (!newTagName.trim()) return;
+    const formattedName = toTitleCase(newTagName.trim());
+
+    const video = videos.find(v => v.id === videoId);
+    if (!video) return;
+
+    logEvent('TAG_CREATE', `Created new ${activeCategory}: "${formattedName}" on video ${videoId}`);
+
+    const currentTags = (video[activeCategory] as string[]) || [];
+    if (!currentTags.includes(formattedName)) {
+      onUpdate(videoId, { [activeCategory]: [...currentTags, formattedName].sort() });
+    }
+
+    // Reset UI and auto-expand the new tag so they see it worked!
+    setIsCreatingTag(false);
+    setNewTagName('');
+    setNewTagVideoSearch('');
+    setExpandedTag(formattedName);
+  };
+
   const startEditing = (tagName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingTag(tagName);
@@ -175,14 +199,12 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
 
   const getVideoDetails = (id: string) => videos.find(v => v.id === id);
 
-  // Filter list of videos available to be added to the current expanded tag
   const availableVideosForTag = useMemo(() => {
     if (!expandedTag) return [];
     
     return videos
       .filter(v => {
         const currentTags = (v[activeCategory] as string[]) || [];
-        // Only show videos that DON'T already have this tag
         return !currentTags.includes(expandedTag);
       })
       .filter(v => {
@@ -199,6 +221,16 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
       });
   }, [videos, expandedTag, activeCategory, videoSearchQuery]);
 
+  // NEW: Filter for the Create Tag video dropdown
+  const filteredVideosForNewTag = useMemo(() => {
+    if (!newTagVideoSearch) return videos.slice(0, 5); // Just show top 5 by default
+    const q = newTagVideoSearch.toLowerCase();
+    return videos.filter(v =>
+      (v.guestName || '').toLowerCase().includes(q) ||
+      v.title.toLowerCase().includes(q)
+    ).slice(0, 5);
+  }, [videos, newTagVideoSearch]);
+
   return (
     <div className="max-w-5xl mx-auto p-6 pb-24 animate-fadeIn">
       
@@ -214,26 +246,94 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
 
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl mb-6 inline-flex">
         <button
-          onClick={() => { setActiveCategory('topics'); setExpandedTag(null); }}
+          onClick={() => { setActiveCategory('topics'); setExpandedTag(null); setIsCreatingTag(false); }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeCategory === 'topics' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
           <Tag size={16} /> Topics
         </button>
         <button
-          onClick={() => { setActiveCategory('guestProfiles'); setExpandedTag(null); }}
+          onClick={() => { setActiveCategory('guestProfiles'); setExpandedTag(null); setIsCreatingTag(false); }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeCategory === 'guestProfiles' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
           <Briefcase size={16} /> Guest Profiles
         </button>
         <button
-          onClick={() => { setActiveCategory('targetAudience'); setExpandedTag(null); }}
+          onClick={() => { setActiveCategory('targetAudience'); setExpandedTag(null); setIsCreatingTag(false); }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeCategory === 'targetAudience' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
           <Users size={16} /> Target Audience
         </button>
       </div>
 
-      {/* REMOVED overflow-hidden here to allow dropdowns to spill over */}
+      {/* NEW: Create Tag UI Block */}
+      {isCreatingTag && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 animate-slideDown shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-blue-900 flex items-center gap-2">
+              <Plus size={18} /> Create New {activeCategory.replace(/([A-Z])/g, ' $1').trim()}
+            </h3>
+            <button onClick={() => setIsCreatingTag(false)} className="text-blue-400 hover:text-blue-700 transition-colors bg-white rounded-full p-1 shadow-sm">
+              <X size={16} />
+            </button>
+          </div>
+          <p className="text-xs text-blue-700 mb-5">
+            Tags must be attached to at least one video to exist. Name your tag and select a starting video below.
+          </p>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-blue-800 uppercase mb-1.5 block tracking-wider">1. Tag Name</label>
+              <input
+                type="text"
+                placeholder="e.g., Artificial Intelligence"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-blue-800 uppercase mb-1.5 block tracking-wider">2. Select Starting Video</label>
+              <div className="relative">
+                 <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+                 <input
+                   type="text"
+                   placeholder="Search for a video..."
+                   value={newTagVideoSearch}
+                   onChange={(e) => setNewTagVideoSearch(e.target.value)}
+                   className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm shadow-sm"
+                 />
+              </div>
+            </div>
+          </div>
+
+          {newTagName.trim() && (
+            <div className="mt-4 bg-white border border-blue-100 rounded-lg shadow-sm overflow-hidden divide-y divide-gray-50">
+              {filteredVideosForNewTag.length > 0 ? (
+                filteredVideosForNewTag.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => handleCreateNewTag(v.id)}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors group flex items-center justify-between"
+                  >
+                    <div className="truncate pr-4">
+                      <div className="font-bold text-sm text-blue-700 group-hover:text-blue-900 truncate">{v.title}</div>
+                      <div className="text-xs text-gray-500 truncate">{v.guestName || 'Solo Episode'}</div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-100 px-2 py-1 rounded">
+                      <Plus size={14} /> Add Tag
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="p-4 text-sm text-center text-gray-400 italic">No videos found matching your search.</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
           <div className="flex items-center gap-6">
@@ -241,7 +341,6 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
               {tagStats.length} Unique Tags Found
             </div>
             
-            {/* Sorting Controls */}
             <div className="flex items-center bg-white border border-gray-200 rounded-lg p-0.5 shadow-sm">
                <button 
                 onClick={() => toggleSort('name')}
@@ -258,8 +357,19 @@ export const TagManager: React.FC<TagManagerProps> = ({ videos, onUpdate }) => {
             </div>
           </div>
           
-          <div className="text-xs text-gray-400 italic hidden sm:block">
-            Tip: Rename a tag to an existing name to merge them.
+          {/* NEW: Toggle Create Tag Button */}
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-gray-400 italic hidden lg:block">
+              Tip: Rename a tag to an existing name to merge them.
+            </div>
+            {!isCreatingTag && (
+              <button 
+                onClick={() => setIsCreatingTag(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm"
+              >
+                <Plus size={14} /> New Tag
+              </button>
+            )}
           </div>
         </div>
 
