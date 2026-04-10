@@ -34,7 +34,7 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
     })));
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview", 
+      model: "gemini-1.5-flash", 
     });
 
     // 1. EXPLICITLY TYPE THE SCHEMA TO SATISFY TYPESCRIPT
