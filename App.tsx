@@ -7,7 +7,7 @@ import { AddVideoModal } from './components/AddVideoModal';
 import { 
   Sparkles, Lock, Plus, List, Grid, Layout, Menu, X, Loader2, 
   BookOpen, BarChart3, Tags, Settings, FileJson, UploadCloud, 
-  RefreshCcw, Database, FileSpreadsheet 
+  RefreshCcw, Database, FileSpreadsheet, LayoutGrid 
 } from 'lucide-react';
 import { searchVideosWithAI } from './services/geminiService';
 import { logEvent, initLoggerSession, syncLogsWithCloud, downloadLogsAsCsv, downloadLogsAsJson } from './services/logger';
@@ -31,6 +31,7 @@ const App: React.FC = () => {
     shortsFilter: 'all'
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoEntry | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -42,18 +43,12 @@ const App: React.FC = () => {
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [aiResultIds, setAiResultIds] = useState<string[] | null>(null);
 
-  // 1. APP INITIALIZATION (Sync Videos and Logs)
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Fetch videos from Firestore
         const fetched = await videoStorage.getAll();
         setVideos(fetched);
-
-        // Sync Analytics logs from Firestore to LocalStorage
         await syncLogsWithCloud();
-        
-        // Initialize Logger (GeoIP)
         await initLoggerSession();
       } catch (e) { 
         console.error("App Init Failed:", e); 
@@ -64,7 +59,6 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // 2. ADMIN ACTIONS
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -75,51 +69,35 @@ const App: React.FC = () => {
       setPasswordInput('');
       await logEvent('ADMIN_LOGIN_SUCCESS');
     } catch (error) {
-      console.error("Login failed", error);
       setPasswordError(true); 
     }
   };
 
   const handleResetApp = async () => {
-    if (window.confirm("⚠️ CLOUD FACTORY RESET ⚠️\n\nThis will permanently delete all videos in Firestore and restore the master catalog.\n\nYour Activity Logs will be preserved. Proceed?")) {
+    if (window.confirm("⚠️ CLOUD FACTORY RESET ⚠️\n\nThis will permanently delete all videos in Firestore and restore the master catalog. Activity logs will be saved.")) {
         try {
             await logEvent('ADMIN_FACTORY_RESET_START');
             await videoStorage.reset(); 
-            
-            // SECURITY FIX: Removed localStorage.clear() to preserve Activity Logs
-            sessionStorage.clear();
-            
+            sessionStorage.clear(); // Clear session but keep localStorage logs
             window.location.reload();
         } catch (e) {
-            console.error("Firestore Reset failed", e);
-            alert("Reset failed. Check console.");
+            alert("Reset failed.");
         }
     }
   };
 
-  // 3. SEARCH & FILTER LOGIC
   const handleAiSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!aiQuery.trim()) return;
-
     setIsAiSearching(true);
     setFilterState(prev => ({ ...prev, searchQuery: '', aiSearchActive: false }));
-
     try {
         const ids = await searchVideosWithAI(aiQuery, videos);
-        if (ids && ids.length > 0) {
-            setAiResultIds(ids);
-            setFilterState(prev => ({ ...prev, aiSearchActive: true }));
-            await logEvent('AI_SEARCH_SUCCESS', `Prompt: "${aiQuery}" | Found: ${ids.length}`);
-        } else {
-            setAiResultIds([]);
-            setFilterState(prev => ({ ...prev, aiSearchActive: true }));
-            await logEvent('AI_SEARCH_EMPTY', `Prompt: "${aiQuery}"`);
-        }
-    } catch (err: any) {
-        console.error("AI Search Error:", err);
-        setAiResultIds([]);
+        setAiResultIds(ids || []);
         setFilterState(prev => ({ ...prev, aiSearchActive: true }));
+        await logEvent('AI_SEARCH', `Prompt: "${aiQuery}"`);
+    } catch (err) {
+        setAiResultIds([]);
     } finally {
         setIsAiSearching(false);
     }
@@ -131,9 +109,12 @@ const App: React.FC = () => {
     setFilterState(prev => ({ ...prev, aiSearchActive: false, searchQuery: '' }));
   };
 
+  const allProfiles = useMemo(() => Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort(), [videos]);
+  const allTopics = useMemo(() => Array.from(new Set(videos.flatMap(v => v.topics || []))).sort(), [videos]);
+  const allAudiences = useMemo(() => Array.from(new Set(videos.flatMap(v => v.targetAudience || []))).sort(), [videos]);
+
   const filteredVideos = useMemo(() => {
     let result = [...videos];
-
     if (filterState.aiSearchActive && aiResultIds) {
       result = result.filter(v => aiResultIds.includes(v.id));
     } else if (filterState.searchQuery) {
@@ -144,49 +125,33 @@ const App: React.FC = () => {
         v.topics?.some(t => t.toLowerCase().includes(q))
       );
     }
-
     if (filterState.selectedProfiles.length > 0) {
       result = result.filter(v => filterState.selectedProfiles.every(p => v.guestProfiles?.includes(p)));
     }
-
     if (filterState.selectedTopics.length > 0) {
       result = result.filter(v => filterState.selectedTopics.every(t => v.topics?.includes(t)));
     }
-
     if (filterState.shortsFilter === 'shorts') {
       result = result.filter(v => v.isShort === 'Y');
     } else if (filterState.shortsFilter === 'videos') {
       result = result.filter(v => v.isShort !== 'Y');
     }
-
-    return result.sort((a, b) => {
-      const bTime = (typeof (b.publishedAt || b.createdAt) === 'number' ? (b.publishedAt || b.createdAt) : new Date(b.publishedAt || b.createdAt).getTime() || 0) as number;
-      const aTime = (typeof (a.publishedAt || a.createdAt) === 'number' ? (a.publishedAt || a.createdAt) : new Date(a.publishedAt || a.createdAt).getTime() || 0) as number;
-      return bTime - aTime;
-    });
+    return result.sort((a, b) => ((b.publishedAt || b.createdAt) as number) - ((a.publishedAt || a.createdAt) as number));
   }, [videos, filterState, aiResultIds]);
 
-  // 4. DATA MANAGEMENT
   const handleVideoAdd = async (newVideo: Omit<VideoEntry, 'id' | 'createdAt'>) => {
-      const completeVideo: VideoEntry = {
-          ...newVideo,
-          id: crypto.randomUUID(),
-          createdAt: Date.now()
-      };
+      const completeVideo: VideoEntry = { ...newVideo, id: crypto.randomUUID(), createdAt: Date.now() };
       const updatedList = await videoStorage.add(completeVideo); 
       setVideos(updatedList);
       setIsModalOpen(false);
-      await logEvent('VIDEO_ADDED', `Title: ${completeVideo.title}`);
+      await logEvent('VIDEO_ADDED', completeVideo.title);
   };
 
   const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
       const updatedList = await videoStorage.update(id, updates);
       setVideos(updatedList); 
-      if (isModalOpen) {
-          setIsModalOpen(false);
-          setEditingVideo(null);
-      }
-      await logEvent('VIDEO_UPDATED', `ID: ${id}`);
+      setIsModalOpen(false);
+      setEditingVideo(null);
   };
 
   const handleVideoDelete = async (id: string) => {
@@ -194,127 +159,92 @@ const App: React.FC = () => {
           const updatedList = await videoStorage.delete(id);
           setVideos(updatedList);
           setIsModalOpen(false);
-          setEditingVideo(null);
-          await logEvent('VIDEO_DELETED', `ID: ${id}`);
+          await logEvent('VIDEO_DELETED', id);
       }
   };
 
-  // Export Helpers
   const downloadVideosAsJson = () => {
     const blob = new Blob([JSON.stringify(videos, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `db_backup_${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `hire_ground_backup_${new Date().toISOString().slice(0,10)}.json`;
     link.click();
   };
 
-  if (isLoading) return (
-    <div className="h-screen flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-blue-600" size={40} />
-      <p className="text-gray-500 font-medium">Loading Directory...</p>
-    </div>
-  );
+  if (isLoading) return <div className="h-screen flex items-center justify-center font-bold text-blue-600">Loading...</div>;
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
       
-      {/* SIDEBAR */}
-      <div className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-white transform transition-transform duration-300 ease-in-out
-        lg:relative lg:translate-x-0 lg:z-20 shrink-0
-        ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
-      `}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white transform transition-transform duration-300 lg:relative lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
         <FilterSidebar 
-          videos={videos}
-          filterState={filterState}
-          setFilterState={setFilterState}
-          availableProfiles={Array.from(new Set(videos.flatMap(v => v.guestProfiles || []))).sort()}
-          availableTopics={Array.from(new Set(videos.flatMap(v => v.topics || []))).sort()}
-          isOpenMobile={isMobileMenuOpen}
-          closeMobile={() => setIsMobileMenuOpen(false)} 
+          videos={videos} filterState={filterState} setFilterState={setFilterState}
+          availableProfiles={allProfiles} availableTopics={allTopics}
+          isOpenMobile={isMobileMenuOpen} closeMobile={() => setIsMobileMenuOpen(false)} 
         />
       </div>
 
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-      )}
-
-      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative z-10">
-        
-        <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 flex items-center justify-between shrink-0 relative z-30 gap-3 md:gap-6">
-          <div className="flex items-center gap-2 min-w-0 shrink-0">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden shrink-0">
-              <Menu size={20} />
-            </button>
-            <h1 className="font-bold text-base md:text-xl truncate hidden sm:block text-gray-900">The Hire Ground Podcast</h1>
+        <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 flex items-center justify-between shrink-0 relative z-30 gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 lg:hidden"><Menu size={20} /></button>
+            <h1 className="font-bold text-base md:text-xl hidden sm:block">The Hire Ground Podcast</h1>
           </div>
 
-          <div className="flex-1 min-w-0 flex items-center justify-center max-w-2xl">
-            <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-xl border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all overflow-hidden h-10 md:h-12 group">
-              <div className="pl-3 text-gray-400 flex items-center justify-center shrink-0">
-                {isAiSearching ? <Loader2 className="animate-spin text-blue-600" size={18} /> : <Sparkles className={aiResultIds ? "text-blue-600" : "text-gray-400"} size={18} />}
-              </div>
-              <input 
-                type="text" 
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                placeholder="Ask AI about episodes..."
-                className="flex-1 px-3 h-full outline-none text-sm text-gray-700 min-w-0 bg-transparent"
-              />
-              {aiResultIds && (
-                <button type="button" onClick={clearAiSearch} className="px-3 h-full text-gray-400 hover:text-gray-600 border-l border-gray-100 bg-gray-50 shrink-0">
-                  <X size={16} />
-                </button>
-              )}
-              <button type="submit" disabled={isAiSearching || !aiQuery.trim()} className="bg-gray-50 h-full hover:bg-gray-100 border-l border-gray-200 px-4 text-gray-600 font-medium text-sm disabled:opacity-50 shrink-0">
-                Search
-              </button>
+          <div className="flex-1 flex items-center justify-center max-w-2xl">
+            <form onSubmit={handleAiSearch} className="relative w-full flex items-center bg-white rounded-xl border border-gray-300 h-10 md:h-12 overflow-hidden group">
+              <div className="pl-3 text-gray-400">{isAiSearching ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}</div>
+              <input type="text" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} placeholder="Ask AI about episodes..." className="flex-1 px-3 outline-none text-sm bg-transparent" />
+              {aiResultIds && <button type="button" onClick={clearAiSearch} className="px-3 border-l"><X size={16} /></button>}
+              <button type="submit" className="bg-gray-50 px-4 text-sm font-medium border-l h-full">Search</button>
             </form>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             {view === 'directory' && (
-              <div className="hidden sm:flex items-center bg-white p-0.5 rounded-lg border border-gray-200 shadow-sm h-10">
-                <button onClick={() => setViewMode('list')} className={`px-3 h-full ${viewMode === 'list' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><List size={18} /></button>
-                <button onClick={() => setViewMode('gallery')} className={`px-3 h-full ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><Layout size={18} /></button>
-                <button onClick={() => setViewMode('detailed')} className={`px-3 h-full ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><Grid size={18} /></button>
+              <div className="hidden sm:flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden h-10">
+                <button onClick={() => setViewMode('list')} className={`px-3 ${viewMode === 'list' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><List size={18} /></button>
+                <button onClick={() => setViewMode('gallery')} className={`px-3 ${viewMode === 'gallery' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><Layout size={18} /></button>
+                <button onClick={() => setViewMode('detailed')} className={`px-3 ${viewMode === 'detailed' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}><Grid size={18} /></button>
               </div>
             )}
             
             {isAdminMode ? (
-              <div className="flex items-center gap-1 md:gap-2 relative">
-                <button onClick={() => setView('analytics')} className={`p-2 rounded-lg ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`} title="Analytics"><BarChart3 size={18} /></button>
-                <button onClick={() => setView('tags')} className={`p-2 rounded-lg ${view === 'tags' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`} title="Tags"><Tags size={18} /></button>
-                <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white p-2 md:px-4 rounded-lg flex items-center gap-2"><Plus size={18} /><span className="hidden md:inline text-sm font-bold">Add</span></button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setView('analytics')} className={`p-2 rounded-lg ${view === 'analytics' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><BarChart3 size={18} /></button>
+                <button onClick={() => setView('tags')} className={`p-2 rounded-lg ${view === 'tags' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><Tags size={18} /></button>
+                <button onClick={() => setView('docs')} className={`p-2 rounded-lg ${view === 'docs' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}><BookOpen size={18} /></button>
+                <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white p-2 md:px-4 rounded-lg flex items-center gap-2"><Plus size={18} /><span className="hidden md:inline font-bold text-sm">Add</span></button>
 
                 <div className="relative">
-                  <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full"><Settings size={20} /></button>
+                  <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 text-gray-500"><Settings size={20} /></button>
                   {isSettingsOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border rounded-xl shadow-xl z-50 overflow-hidden">
                       <div className="p-2 space-y-1">
-                        <button onClick={() => handleResetApp()} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"><RefreshCcw size={14} /> Factory Reset</button>
-                        <button onClick={() => { downloadVideosAsJson(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><FileJson size={14} /> Export JSON</button>
-                        <button onClick={() => { downloadLogsAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"><FileSpreadsheet size={14} /> Export Logs (CSV)</button>
-                        <button onClick={() => { setIsAdminMode(false); setView('directory'); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg font-bold border-t border-gray-100 mt-1">Logout</button>
+                        <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase">System</div>
+                        <button onClick={() => { setShowPublishModal(true); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"><UploadCloud size={14} className="text-green-600" /> Publish Updates</button>
+                        <button onClick={() => handleResetApp()} className="w-full text-left px-3 py-2 text-sm text-red-600 flex items-center gap-2 hover:bg-red-50"><RefreshCcw size={14} /> Factory Reset</button>
+                        <div className="h-px bg-gray-100 my-1"></div>
+                        <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase">Data</div>
+                        <button onClick={() => downloadVideosAsJson()} className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"><FileJson size={14} /> Backup JSON</button>
+                        <button onClick={() => downloadLogsAsCsv()} className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"><FileSpreadsheet size={14} /> Activity CSV</button>
+                        <button onClick={() => { setIsAdminMode(false); setView('directory'); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm font-bold text-red-600 border-t mt-1">Logout</button>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 hover:text-gray-600 p-2 flex items-center gap-1.5"><Lock size={18} /><span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Admin</span></button>
+              <button onClick={() => setShowPasswordModal(true)} className="text-gray-400 p-2 flex items-center gap-1.5"><Lock size={18} /><span className="text-xs font-bold uppercase">Admin</span></button>
             )}
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50 relative z-10">
+        <main className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50">
           {view === 'directory' && (
             <div className="max-w-7xl mx-auto">
-              <div className="mb-4 md:mb-6">
-                 <p className="text-xs md:text-sm text-gray-500 font-medium">Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes</p>
-              </div>
-              <div className={`grid gap-4 md:gap-6 ${viewMode === 'list' ? 'grid-cols-1' : viewMode === 'gallery' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-4'}`}>
+              <p className="text-xs text-gray-500 mb-4">Found <span className="text-blue-600 font-bold">{filteredVideos.length}</span> episodes</p>
+              <div className={`grid gap-4 md:gap-6 ${viewMode === 'list' ? 'grid-cols-1' : viewMode === 'gallery' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-4 xl:grid-cols-5'}`}>
                 {filteredVideos.map(v => <VideoCard key={v.id} video={v} isAdmin={isAdminMode} onEdit={() => { setEditingVideo(v); setIsModalOpen(true); }} viewMode={viewMode} />)}
               </div>
             </div>
@@ -325,7 +255,6 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      {/* LOGIN MODAL */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm">
@@ -342,14 +271,13 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* VIDEO MODAL */}
       {isModalOpen && (
         <AddVideoModal 
-          isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingVideo(null); } }
+          isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingVideo(null); }}
           editVideo={editingVideo} existingVideos={videos}
-          availableProfiles={Array.from(new Set(videos.flatMap(v => v.guestProfiles || [])))}
-          availableTopics={Array.from(new Set(videos.flatMap(v => v.topics || [])))}
-          onAdd={handleVideoAdd} onUpdate={handleVideoUpdate} onDelete={handleVideoDelete} availableAudiences={[]}        />
+          availableProfiles={allProfiles} availableTopics={allTopics} availableAudiences={allAudiences}
+          onAdd={handleVideoAdd} onUpdate={handleVideoUpdate} onDelete={handleVideoDelete}
+        />
       )}
     </div>
   );
