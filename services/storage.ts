@@ -4,7 +4,7 @@ import { VideoEntry } from '../types';
 import { MASTER_SEED_DATA } from '../seedData'; // Ensure this matches your seed file path
 
 const COLLECTION_NAME = "videos";
-
+const LOGS_COLLECTION = "activity_logs"; // Define the collection for logs
 export const videoStorage = {
   // 1. Fetch all videos from Firestore ordered by creation date
   getAll: async (): Promise<VideoEntry[]> => {
@@ -59,6 +59,15 @@ bulkAdd: async (videos: VideoEntry[]): Promise<VideoEntry[]> => {
     throw error;
   }
 },
+saveLog: async (log: any) => {
+    try {
+      const docRef = doc(db, LOGS_COLLECTION, crypto.randomUUID());
+      await setDoc(docRef, log);
+    } catch (e) {
+      console.error("Cloud Logger Error:", e);
+    }
+  },
+
 
   // 2. App.tsx expects this on initial load to know where data came from
   syncWithCloud: async (): Promise<{ videos: VideoEntry[], source: 'cloud' | 'local' }> => {
@@ -137,5 +146,16 @@ bulkAdd: async (videos: VideoEntry[]): Promise<VideoEntry[]> => {
       const content = `${video.title} ${video.headline} ${video.guestName} ${video.topics.join(' ')}`.toLowerCase();
       return searchTerms.every(term => content.includes(term));
     });
+  },
+  getAllLogs: async (): Promise<any[]> => {
+    try {
+      // Use "timestamp" for ordering as defined in your LogEntry interface
+      const q = query(collection(db, LOGS_COLLECTION), orderBy("timestamp", "desc"));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data());
+    } catch (e) {
+      console.error("Failed to pull cloud logs:", e);
+      return [];
+    }
   }
 };
