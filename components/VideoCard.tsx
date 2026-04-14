@@ -25,10 +25,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     ? `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`
     : PENDING_IMAGE;
 
-  // Trackers
-  const YT_TRACKER = "si=HGWebsite";
-  const getSpotifyUrl = (url: string) => `${url}${url.includes('?') ? '&' : '?'}${YT_TRACKER}`;
-  const getYoutubeUrl = (id: string) => `https://www.youtube.com/watch?v=${id}&${YT_TRACKER}`;
+  // Tracking Helper
+  const TRACKER = "si=HGWebsite";
 
   const handleWatchClick = () => {
       logEvent('VIDEO_WATCH_CLICK', `User clicked to watch: ${video.title} (${video.youtubeId})`);
@@ -67,7 +65,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
             </div>
           )}
           {hasYoutube && (
-             <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors group-hover:opacity-100">
+             <a href={`https://www.youtube.com/watch?v=${video.youtubeId}&${TRACKER}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors group-hover:opacity-100">
                 <Play fill="white" className="text-white drop-shadow-md opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
              </a>
           )}
@@ -93,8 +91,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
             )}
 
             <div className="flex items-center gap-3 mt-auto">
-              {hasYoutube && <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"><ExternalLink size={10}/> YouTube</a>}
-              {hasSpotify && video.spotifyUrl && <a href={getSpotifyUrl(video.spotifyUrl)} target="_blank" rel="noopener noreferrer" onClick={handleSpotifyClick} className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1"><ExternalLink size={10}/> Spotify</a>}
+               {hasYoutube && <a href={`https://www.youtube.com/watch?v=${video.youtubeId}&${TRACKER}`} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"><ExternalLink size={10}/> YouTube</a>}
+               {hasSpotify && video.spotifyUrl && <a href={`${video.spotifyUrl}${video.spotifyUrl.includes('?') ? '&' : '?'}${TRACKER}`} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1"><ExternalLink size={10}/> Spotify</a>}
             </div>
         </div>
 
@@ -115,7 +113,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
           <img src={thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={(e) => { (e.target as HTMLImageElement).src = PENDING_IMAGE; }} />
           {isShort && <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm"><Zap size={10} fill="currentColor" /> Short</div>}
           {hasYoutube ? (
-            <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10">
+            <a href={`https://www.youtube.com/watch?v=${video.youtubeId}&${TRACKER}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10">
               <div className="bg-white text-gray-900 p-3 rounded-full shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Play fill="currentColor" size={20} /></div>
             </a>
           ) : (
@@ -155,120 +153,59 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full relative">
       <div className="relative aspect-video bg-gray-100 overflow-hidden z-0 flex-shrink-0">
-        <img
-          src={thumbnail}
-          alt={video.title}
-          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${!hasYoutube ? 'opacity-80 grayscale-[30%]' : ''}`}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = PENDING_IMAGE;
-          }}
-        />
-        
-        {isShort && (
-          <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm">
-            <Zap size={10} fill="currentColor" />
-            Short
-          </div>
-        )}
-
+        <img src={thumbnail} alt={video.title} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${!hasYoutube ? 'opacity-80 grayscale-[30%]' : ''}`} onError={(e) => { (e.target as HTMLImageElement).src = PENDING_IMAGE; }} />
+        {isShort && <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm"><Zap size={10} fill="currentColor" /> Short</div>}
         {hasYoutube ? (
-          <a
-            href={getYoutubeUrl(video.youtubeId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleWatchClick}
-            className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10"
-          >
+          <a href={`https://www.youtube.com/watch?v=${video.youtubeId}&${TRACKER}`} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10" >
             <div className="bg-red-600 text-white p-3 rounded-full shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
               <Play fill="currentColor" size={24} />
             </div>
           </a>
         ) : (
              <div className="absolute inset-0 flex items-center justify-center bg-black/10 z-10">
-                 <div className="bg-white/90 text-gray-600 p-2 rounded-full shadow-sm">
-                    <Mic size={20} />
-                 </div>
+                 <div className="bg-white/90 text-gray-600 p-2 rounded-full shadow-sm"><Mic size={20} /></div>
              </div>
         )}
       </div>
 
       <div className="p-5 flex flex-col flex-grow relative z-0 bg-white">
         <div className="mb-2">
-           {video.guestName && (
-             <span className="text-xs font-bold text-blue-600 uppercase tracking-wide block mb-1">
-               Guest: {video.guestName}
-             </span>
-           )}
+           {video.guestName && <span className="text-xs font-bold text-blue-600 uppercase tracking-wide block mb-1">Guest: {video.guestName}</span>}
            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-lg leading-tight text-gray-900 line-clamp-2" title={video.title}>
-                {video.title}
-              </h3>
+              <h3 className="font-semibold text-lg leading-tight text-gray-900 line-clamp-2" title={video.title}>{video.title}</h3>
            </div>
         </div>
-        
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3 font-medium">
-          {headlineText}
-        </p>
-
+        <p className="text-gray-600 text-sm mb-4 line-clamp-3 font-medium">{headlineText}</p>
         <div className="space-y-3 mb-4">
           {video.guestProfiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              <div className="flex items-center text-xs font-medium text-gray-500 mr-1" title="Job Profile">
-                <Briefcase size={12} className="mr-1" />
-                Profile:
-              </div>
-              {video.guestProfiles.map((p, i) => (
-                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                  {p}
-                </span>
-              ))}
+              <div className="flex items-center text-xs font-medium text-gray-500 mr-1" title="Job Profile"><Briefcase size={12} className="mr-1" />Profile:</div>
+              {video.guestProfiles.map((p, i) => (<span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">{p}</span>))}
             </div>
           )}
-          
           {video.topics.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              <div className="flex items-center text-xs font-medium text-gray-500 mr-1" title="Topics">
-                <Tag size={12} className="mr-1" />
-                Topics:
-              </div>
-              {video.topics.map((t, i) => (
-                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                  {t}
-                </span>
-              ))}
+              <div className="flex items-center text-xs font-medium text-gray-500 mr-1" title="Topics"><Tag size={12} className="mr-1" />Topics:</div>
+              {video.topics.map((t, i) => (<span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">{t}</span>))}
             </div>
           )}
-
           {video.targetAudience && video.targetAudience.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50">
-               <div className="flex items-center text-xs font-medium text-gray-500 mr-1">
-                  <Users size={12} className="mr-1" />
-                  For:
-               </div>
-               {video.targetAudience.map((a, i) => (
-                  <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                    {a}
-                  </span>
-               ))}
+               <div className="flex items-center text-xs font-medium text-gray-500 mr-1"><Users size={12} className="mr-1" />For:</div>
+               {video.targetAudience.map((a, i) => (<span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">{a}</span>))}
             </div>
           )}
         </div>
 
         {video.fullDescription && (
             <div className="mt-auto pt-2 border-t border-gray-100">
-                <button 
-                    type="button"
-                    onClick={() => setShowFullDesc(!showFullDesc)}
-                    className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-blue-600 transition-colors w-full justify-start"
-                >
+                <button type="button" onClick={() => setShowFullDesc(!showFullDesc)} className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-blue-600 transition-colors w-full justify-start">
                     {showFullDesc ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     {showFullDesc ? 'Hide Details' : 'Show Full Description'}
                 </button>
                 {showFullDesc && (
                     <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed animate-fadeIn">
-                        {(video.fullDescription || '').split('\n').map((line, i) => (
-                            <p key={i} className="mb-1 last:mb-0">{line || <br/>}</p>
-                        ))}
+                        {(video.fullDescription || '').split('\n').map((line, i) => (<p key={i} className="mb-1 last:mb-0">{line || <br/>}</p>))}
                     </div>
                 )}
             </div>
@@ -278,42 +215,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
            <span>{displayDate}</span>
            <div className="flex gap-3">
                {hasYoutube && (
-                   <a 
-                     href={getYoutubeUrl(video.youtubeId)}
-                     target="_blank" 
-                     rel="noopener noreferrer"
-                     onClick={handleWatchClick}
-                     className="flex items-center hover:text-red-600 transition-colors font-medium"
-                   >
-                     YouTube <ExternalLink size={10} className="ml-1" />
-                   </a>
+                   <a href={`https://www.youtube.com/watch?v=${video.youtubeId}&${TRACKER}`} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="flex items-center hover:text-red-600 transition-colors font-medium">YouTube <ExternalLink size={10} className="ml-1" /></a>
                )}
                {hasSpotify && video.spotifyUrl && (
-                   <a 
-                     href={getSpotifyUrl(video.spotifyUrl)}
-                     target="_blank" 
-                     rel="noopener noreferrer"
-                     onClick={handleSpotifyClick}
-                     className="flex items-center hover:text-green-600 transition-colors font-medium"
-                   >
-                     Spotify <ExternalLink size={10} className="ml-1" />
-                   </a>
+                   <a href={`${video.spotifyUrl}${video.spotifyUrl.includes('?') ? '&' : '?'}${TRACKER}`} target="_blank" rel="noopener noreferrer" onClick={handleSpotifyClick} className="flex items-center hover:text-green-600 transition-colors font-medium">Spotify <ExternalLink size={10} className="ml-1" /></a>
                )}
            </div>
         </div>
       </div>
 
       {isAdmin && (
-        <div 
-            className="absolute top-2 right-2 z-50 pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="p-2 bg-white text-blue-600 rounded-full shadow-lg hover:bg-blue-50 hover:text-blue-700 transition-all cursor-pointer border border-gray-200 flex items-center justify-center transform hover:scale-105 active:scale-95"
-            title="Edit Metadata"
-          >
+        <div className="absolute top-2 right-2 z-50 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+          <button type="button" onClick={handleEdit} className="p-2 bg-white text-blue-600 rounded-full shadow-lg hover:bg-blue-50 hover:text-blue-700 transition-all cursor-pointer border border-gray-200 flex items-center justify-center transform hover:scale-105 active:scale-95" title="Edit Metadata">
             <Edit2 size={16} />
           </button>
         </div>
