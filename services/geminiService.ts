@@ -34,7 +34,7 @@ export const searchVideosWithAI = async (query: string, videos: VideoEntry[]): P
     })));
 
     // Change this line in both searchVideosWithAI and analyzeVideoContent
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
     // 1. EXPLICITLY TYPE THE SCHEMA TO SATISFY TYPESCRIPT
     const responseSchema: Schema = {
@@ -111,7 +111,7 @@ export const analyzeVideoContent = async (
   };
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-001",
     generationConfig: { responseMimeType: "application/json", responseSchema: schema }
   });
 
@@ -159,7 +159,7 @@ export const parseBulkVideoInput = async (
   };
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-001",
     generationConfig: { responseMimeType: "application/json", responseSchema: schema }
   });
 
