@@ -1,6 +1,5 @@
-
-import React, { useMemo, useEffect, useState } from 'react';
-import { getMarketingStats, MarketingStats } from '../services/logger';
+import React, { useEffect, useState } from 'react';
+import { getMarketingStats, MarketingStats, syncLogsWithCloud } from '../services/logger';
 import { 
   TrendingUp, 
   Globe, 
@@ -14,13 +13,35 @@ import {
 
 export const AnalyticsDashboard: React.FC = () => {
   const [stats, setStats] = useState<MarketingStats | null>(null);
+  const [isSyncing, setIsSyncing] = useState(true);
 
   useEffect(() => {
-    // Load stats on mount
-    setStats(getMarketingStats());
+    const loadAndSyncStats = async () => {
+      setIsSyncing(true);
+      try {
+        // 1. Sync local memory with Cloud Firestore logs
+        await syncLogsWithCloud();
+        
+        // 2. Calculate stats from the now-updated LocalStorage
+        setStats(getMarketingStats());
+      } catch (error) {
+        console.error("Dashboard Sync Failed:", error);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    loadAndSyncStats();
   }, []);
 
-  if (!stats) return <div className="p-10 text-center text-gray-500">Loading Analytics...</div>;
+  if (isSyncing) return (
+    <div className="p-20 text-center space-y-4">
+      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+      <p className="text-gray-500 font-medium">Syncing Cloud Intelligence...</p>
+    </div>
+  );
+
+  if (!stats) return <div className="p-10 text-center text-gray-500">No analytics data available.</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 pb-24 space-y-8 animate-fadeIn">
@@ -86,7 +107,7 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="h-64 flex items-end gap-2 sm:gap-4">
             {stats.dailyActivity.length > 0 ? (
                 stats.dailyActivity.map((day, i) => {
-                    const max = Math.max(...stats.dailyActivity.map(d => d.count));
+                    const max = Math.max(...stats.dailyActivity.map(d => d.count), 1);
                     const heightPct = (day.count / max) * 100;
                     return (
                         <div key={i} className="flex-1 flex flex-col justify-end group relative">
@@ -120,7 +141,7 @@ export const AnalyticsDashboard: React.FC = () => {
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Top Profiles Requested</h4>
                 <div className="space-y-2">
                     {stats.topProfiles.length > 0 ? stats.topProfiles.slice(0,5).map((p, i) => (
-                        <ProgressBar key={i} label={p.name} count={p.count} total={Math.max(...stats.topProfiles.map(x => x.count))} color="bg-emerald-500" />
+                        <ProgressBar key={i} label={p.name} count={p.count} total={Math.max(...stats.topProfiles.map(x => x.count), 1)} color="bg-emerald-500" />
                     )) : <p className="text-sm text-gray-400 italic">No profile filters used yet</p>}
                 </div>
             </div>
@@ -129,7 +150,7 @@ export const AnalyticsDashboard: React.FC = () => {
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Top Topics Requested</h4>
                 <div className="space-y-2">
                     {stats.topTopics.length > 0 ? stats.topTopics.slice(0,5).map((t, i) => (
-                        <ProgressBar key={i} label={t.name} count={t.count} total={Math.max(...stats.topTopics.map(x => x.count))} color="bg-violet-500" />
+                        <ProgressBar key={i} label={t.name} count={t.count} total={Math.max(...stats.topTopics.map(x => x.count), 1)} color="bg-violet-500" />
                     )) : <p className="text-sm text-gray-400 italic">No topic filters used yet</p>}
                 </div>
             </div>
@@ -154,31 +175,21 @@ export const AnalyticsDashboard: React.FC = () => {
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <th className="px-6 py-3">Query / Prompt</th>
                         <th className="px-6 py-3">Type</th>
-                        <th className="px-6 py-3">Results Found</th>
                         <th className="px-6 py-3 text-right">Time</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {stats.recentSearches.length > 0 ? (
-                        stats.recentSearches.slice(0, 10).map((search, i) => (
+                        stats.recentSearches.slice(0, 15).map((search, i) => (
                             <tr key={i} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-3 text-sm font-medium text-gray-900">"{search.query}"</td>
                                 <td className="px-6 py-3 text-sm">
                                     {search.resultsCount === -1 ? (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Keyword</span>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Keyword Search</span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                                             <Search size={10} /> AI Semantic
                                         </span>
-                                    )}
-                                </td>
-                                <td className="px-6 py-3 text-sm">
-                                    {search.resultsCount === -1 ? (
-                                        <span className="text-gray-400">-</span>
-                                    ) : search.resultsCount === 0 ? (
-                                        <span className="text-red-600 font-bold flex items-center gap-1">0 <span className="text-[10px] font-normal text-red-400">(Content Gap)</span></span>
-                                    ) : (
-                                        <span className="text-green-600 font-bold">{search.resultsCount}</span>
                                     )}
                                 </td>
                                 <td className="px-6 py-3 text-sm text-gray-500 text-right font-mono text-xs">
@@ -188,7 +199,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">No search data recorded yet.</td>
+                            <td colSpan={3} className="px-6 py-8 text-center text-gray-400 italic">No search data recorded yet.</td>
                         </tr>
                     )}
                 </tbody>
@@ -239,7 +250,7 @@ interface ProgressBarProps {
 }
 
 const ProgressBar: React.FC<ProgressBarProps> = ({ label, count, total, color }) => {
-    const pct = Math.max(5, (count / total) * 100); // Min width for visibility
+    const pct = Math.max(5, (count / total) * 100); 
     return (
         <div className="relative pt-1">
             <div className="flex mb-1 items-center justify-between">
