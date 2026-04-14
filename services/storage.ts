@@ -20,7 +20,45 @@ export const videoStorage = {
       console.error("Error fetching videos from Firestore:", error);
       return [];
     }
+    
   },
+  // Add this new function to the videoStorage object in storage.ts
+bulkAdd: async (videos: VideoEntry[]): Promise<VideoEntry[]> => {
+  try {
+    // 1. Get all current videos to check for duplicates
+    const currentVideos = await videoStorage.getAll();
+    const existingYoutubeIds = new Set(currentVideos.map(v => v.youtubeId));
+
+    const batch = writeBatch(db);
+    let importCount = 0;
+
+    videos.forEach((video) => {
+      // 2. Only stage the video if its youtubeId isn't already in the database
+      if (!existingYoutubeIds.has(video.youtubeId)) {
+        const id = video.id || crypto.randomUUID();
+        const docRef = doc(db, COLLECTION_NAME, id);
+        batch.set(docRef, {
+          ...video,
+          id,
+          createdAt: video.createdAt || Date.now()
+        });
+        importCount++;
+      }
+    });
+    
+    if (importCount > 0) {
+      await batch.commit();
+      console.log(`Successfully imported ${importCount} new episodes. Skipped duplicates.`);
+    } else {
+      console.log("No new episodes found to import.");
+    }
+
+    return await videoStorage.getAll();
+  } catch (error) {
+    console.error("Error during filtered bulk import:", error);
+    throw error;
+  }
+},
 
   // 2. App.tsx expects this on initial load to know where data came from
   syncWithCloud: async (): Promise<{ videos: VideoEntry[], source: 'cloud' | 'local' }> => {
