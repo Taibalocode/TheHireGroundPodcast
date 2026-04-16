@@ -221,38 +221,95 @@ const App: React.FC = () => {
       setVideos(updatedList);
       setIsModalOpen(false);
   };
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const fileContent = event.target?.result as string;
-        const parsedData = JSON.parse(fileContent);
+        const csvText = event.target?.result as string;
+        // Split by newlines, handling both Windows and Mac line endings
+        const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
 
-        if (!Array.isArray(parsedData)) {
-            throw new Error("Invalid format: Expected an array of videos.");
+        if (lines.length < 2) throw new Error("CSV is empty or missing data rows.");
+
+        // Custom parser to handle Google Sheets quoting (e.g., "Hello, World")
+        const parseRow = (str: string) => {
+            const result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < str.length; i++) {
+                if (inQuotes) {
+                    if (str[i] === '"' && str[i + 1] === '"') { cur += '"'; i++; } // Escaped quote
+                    else if (str[i] === '"') { inQuotes = false; }
+                    else { cur += str[i]; }
+                } else {
+                    if (str[i] === '"') { inQuotes = true; }
+                    else if (str[i] === ',') { result.push(cur.trim()); cur = ''; }
+                    else { cur += str[i]; }
+                }
+            }
+            result.push(cur.trim());
+            return result;
+        };
+
+        // Normalize headers to lowercase, removing spaces/special characters for easy matching
+        const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const parsedVideos: VideoEntry[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const row = parseRow(lines[i]);
+          if (row.length < 2) continue; // Skip empty/malformed rows
+
+          // Helper to find the right column regardless of slight naming variations in the CSV
+          const getVal = (possibleNames: string[]) => {
+             const idx = headers.findIndex(h => possibleNames.some(n => h.includes(n)));
+             return idx !== -1 ? row[idx] : '';
+          };
+
+          // Helper to parse comma or pipe-separated lists in a single cell
+          const parseArray = (val: string) => val.split(/[,|]/).map(s => s.trim()).filter(s => s !== '');
+
+          const video: VideoEntry = {
+            id: crypto.randomUUID(),
+            title: getVal(['title']),
+            headline: getVal(['headline']),
+            fullDescription: getVal(['description', 'fulldescription']),
+            guestName: getVal(['guest', 'guestname']),
+            isShort: getVal(['isshort', 'short']).toUpperCase() === 'Y' ? 'Y' : 'N',
+            youtubeId: getVal(['youtube', 'youtubeid', 'videoid']),
+            spotifyUrl: getVal(['spotify', 'spotifyurl']),
+            guestProfiles: parseArray(getVal(['profile', 'guestprofile', 'guestprofiles'])),
+            targetAudience: parseArray(getVal(['audience', 'targetaudience'])),
+            topics: parseArray(getVal(['topic', 'topics'])),
+            createdAt: Date.now()
+          };
+
+          // Only stage the video if it has the bare minimum requirements
+          if (video.title && video.youtubeId) {
+              parsedVideos.push(video);
+          }
         }
 
-        // Send the parsed array to the bulkAdd function we built in storage.ts
-        const updatedList = await videoStorage.bulkAdd(parsedData);
-        
-        // Update the UI
+        if (parsedVideos.length === 0) {
+            throw new Error("No valid videos found. Ensure your CSV has 'Title' and 'YouTubeID' columns.");
+        }
+
+        // Send to our storage batcher (which skips duplicates automatically!)
+        const updatedList = await videoStorage.bulkAdd(parsedVideos);
         setVideos(updatedList);
-        alert(`Success! Processed ${parsedData.length} total items from the file. Duplicates were skipped.`);
         
-      } catch (error) {
-        console.error("Upload failed:", error);
-        alert("Failed to read the file. Please ensure it is a valid JSON backup file.");
+        alert(`Success! Processed ${parsedVideos.length} valid rows from CSV. Duplicates were safely skipped.`);
+
+      } catch (error: any) {
+        console.error("CSV Upload failed:", error);
+        alert(`Upload failed: ${error.message}`);
       }
     };
     
-    // Read the file as text
     reader.readAsText(file);
-    
-    // Reset the input so you can upload the same file again if you need to
-    e.target.value = '';
+    e.target.value = ''; // Reset input
   };
 
   const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
@@ -415,15 +472,15 @@ const App: React.FC = () => {
                                   {/* Data Export Section */}
                                   <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Import</div>
 
-                                  <label htmlFor="bulk-upload" className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
-                                  <UploadCloud size={14} className="text-purple-600" /> Upload JSON
+                                  <label htmlFor="csv-upload" className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
+                                  <UploadCloud size={14} className="text-purple-600" /> Upload (CSV)
                                   </label>
                                   <input 
-                                  id="bulk-upload" 
+                                  id="csv-upload" 
                                   type="file" 
-                                  accept=".json" 
+                                  accept=".csv" 
                                   className="hidden" 
-                                  onChange={handleFileUpload} 
+                                  onChange={handleCsvUpload} 
                                   />
 
                                   <div className="h-px bg-gray-100 my-1"></div>
