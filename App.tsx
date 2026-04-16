@@ -221,6 +221,39 @@ const App: React.FC = () => {
       setVideos(updatedList);
       setIsModalOpen(false);
   };
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const fileContent = event.target?.result as string;
+        const parsedData = JSON.parse(fileContent);
+
+        if (!Array.isArray(parsedData)) {
+            throw new Error("Invalid format: Expected an array of videos.");
+        }
+
+        // Send the parsed array to the bulkAdd function we built in storage.ts
+        const updatedList = await videoStorage.bulkAdd(parsedData);
+        
+        // Update the UI
+        setVideos(updatedList);
+        alert(`Success! Processed ${parsedData.length} total items from the file. Duplicates were skipped.`);
+        
+      } catch (error) {
+        console.error("Upload failed:", error);
+        alert("Failed to read the file. Please ensure it is a valid JSON backup file.");
+      }
+    };
+    
+    // Read the file as text
+    reader.readAsText(file);
+    
+    // Reset the input so you can upload the same file again if you need to
+    e.target.value = '';
+  };
 
   const handleVideoUpdate = async (id: string, updates: Partial<VideoEntry>) => {
       const updatedList = await videoStorage.update(id, updates);
@@ -380,6 +413,20 @@ const App: React.FC = () => {
                                   <div className="h-px bg-gray-100 my-1"></div>
                                   
                                   {/* Data Export Section */}
+                                  <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Import</div>
+
+                                  <label htmlFor="bulk-upload" className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2 cursor-pointer">
+                                  <UploadCloud size={14} className="text-purple-600" /> Upload JSON
+                                  </label>
+                                  <input 
+                                  id="bulk-upload" 
+                                  type="file" 
+                                  accept=".json" 
+                                  className="hidden" 
+                                  onChange={handleFileUpload} 
+                                  />
+
+                                  <div className="h-px bg-gray-100 my-1"></div>
                                   <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Data Export</div>
                                   <button onClick={() => { downloadVideosAsCsv(); setIsSettingsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2">
                                       <Database size={14} className="text-blue-600" /> Export Videos (CSV)
