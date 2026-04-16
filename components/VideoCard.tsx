@@ -25,11 +25,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     ? `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`
     : PENDING_IMAGE;
 
-  // Trackers
-  const YT_TRACKER = "si=HGWebsite";
-  const getSpotifyUrl = (url: string) => `${url}${url.includes('?') ? '&' : '?'}${YT_TRACKER}`;
-  const getYoutubeUrl = (id: string) => `https://www.youtube.com/watch?v=${id}&${YT_TRACKER}`;
-
   const handleWatchClick = () => {
       logEvent('VIDEO_WATCH_CLICK', `User clicked to watch: ${video.title} (${video.youtubeId})`);
   };
@@ -50,10 +45,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
 
   const headlineText = video.headline || video.description || "No headline provided.";
 
+  // --- Render Logic for Different Modes ---
+
   // 1. LIST VIEW
   if (viewMode === 'list') {
     return (
       <div className="group bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-row h-32 relative">
+        {/* Compact Thumbnail */}
         <div className="relative w-48 bg-gray-100 flex-shrink-0">
           <img
             src={thumbnail}
@@ -67,37 +65,40 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
             </div>
           )}
           {hasYoutube && (
-             <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors group-hover:opacity-100">
+             <a href={`https://www.youtube.com/watch?v=${video.youtubeId}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors group-hover:opacity-100">
                 <Play fill="white" className="text-white drop-shadow-md opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
              </a>
           )}
         </div>
 
+        {/* List Content */}
         <div className="p-4 flex-grow flex flex-col justify-center min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {video.guestName && <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{video.guestName}</span>}
-              <span className="text-[10px] text-gray-400 flex items-center gap-1"><Calendar size={10} /> {displayDate}</span>
-            </div>
-            <h3 className="font-semibold text-sm text-gray-900 leading-tight line-clamp-1 mb-1" title={video.title}>
-               {video.title}
-            </h3>
-            
-            {video.targetAudience && video.targetAudience.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-2">
-                {video.targetAudience.map((a, i) => (
-                  <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-600 border border-purple-100 whitespace-nowrap">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            )}
+           <div className="flex items-center gap-2 mb-1">
+             {video.guestName && <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{video.guestName}</span>}
+             <span className="text-[10px] text-gray-400 flex items-center gap-1"><Calendar size={10} /> {displayDate}</span>
+           </div>
+           <h3 className="font-semibold text-sm text-gray-900 leading-tight line-clamp-1 mb-1" title={video.title}>
+              {video.title}
+           </h3>
+           
+           {/* Added Target Audience to List View */}
+           {video.targetAudience && video.targetAudience.length > 0 && (
+             <div className="flex flex-wrap gap-1 mb-2">
+               {video.targetAudience.map((a, i) => (
+                 <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-600 border border-purple-100 whitespace-nowrap">
+                   {a}
+                 </span>
+               ))}
+             </div>
+           )}
 
-            <div className="flex items-center gap-3 mt-auto">
-              {hasYoutube && <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"><ExternalLink size={10}/> YouTube</a>}
-              {hasSpotify && video.spotifyUrl && <a href={getSpotifyUrl(video.spotifyUrl)} target="_blank" rel="noopener noreferrer" onClick={handleSpotifyClick} className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1"><ExternalLink size={10}/> Spotify</a>}
-            </div>
+           <div className="flex items-center gap-3 mt-auto">
+              {hasYoutube && <a href={`https://www.youtube.com/watch?v=${video.youtubeId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"><ExternalLink size={10}/> YouTube</a>}
+              {hasSpotify && <a href={video.spotifyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-green-600 flex items-center gap-1"><ExternalLink size={10}/> Spotify</a>}
+           </div>
         </div>
 
+        {/* Edit Button */}
         {isAdmin && (
           <button onClick={handleEdit} className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
             <Edit2 size={14} />
@@ -107,7 +108,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     );
   }
 
-  // 2. DETAILED VIEW
+  // 2. DETAILED VIEW (Swapped: Now uses the Simple Compact Card for the 5-column grid)
   if (viewMode === 'detailed') {
     return (
       <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full relative">
@@ -115,7 +116,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
           <img src={thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={(e) => { (e.target as HTMLImageElement).src = PENDING_IMAGE; }} />
           {isShort && <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm"><Zap size={10} fill="currentColor" /> Short</div>}
           {hasYoutube ? (
-            <a href={getYoutubeUrl(video.youtubeId)} target="_blank" rel="noopener noreferrer" onClick={handleWatchClick} className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10">
+            <a href={`https://www.youtube.com/watch?v=${video.youtubeId}`} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] z-10">
               <div className="bg-white text-gray-900 p-3 rounded-full shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Play fill="currentColor" size={20} /></div>
             </a>
           ) : (
@@ -151,9 +152,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
     );
   }
 
-  // 3. GALLERY VIEW
+  // 3. GALLERY VIEW (Swapped: Now uses the Original Rich Card for the 3-column grid)
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full relative">
+      
+      {/* Thumbnail Section */}
       <div className="relative aspect-video bg-gray-100 overflow-hidden z-0 flex-shrink-0">
         <img
           src={thumbnail}
@@ -173,7 +176,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
 
         {hasYoutube ? (
           <a
-            href={getYoutubeUrl(video.youtubeId)}
+            href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleWatchClick}
@@ -192,6 +195,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
         )}
       </div>
 
+      {/* Content Section */}
       <div className="p-5 flex flex-col flex-grow relative z-0 bg-white">
         <div className="mb-2">
            {video.guestName && (
@@ -279,7 +283,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
            <div className="flex gap-3">
                {hasYoutube && (
                    <a 
-                     href={getYoutubeUrl(video.youtubeId)}
+                     href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
                      target="_blank" 
                      rel="noopener noreferrer"
                      onClick={handleWatchClick}
@@ -288,9 +292,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, isAdmin, onEdit, vi
                      YouTube <ExternalLink size={10} className="ml-1" />
                    </a>
                )}
-               {hasSpotify && video.spotifyUrl && (
+               {hasSpotify && (
                    <a 
-                     href={getSpotifyUrl(video.spotifyUrl)}
+                     href={video.spotifyUrl}
                      target="_blank" 
                      rel="noopener noreferrer"
                      onClick={handleSpotifyClick}
