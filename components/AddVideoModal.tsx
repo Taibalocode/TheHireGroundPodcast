@@ -60,6 +60,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
     setTitle(''); setHeadline(''); setFullDescription(''); setGuestName('');
     setIsShort('N'); setYoutubeId(''); setSpotifyUrl('');
     setGuestProfiles([]); setTargetAudience([]); setTopics([]);
+    setProfileInput(''); setAudienceInput(''); setTopicInput('');
   };
 
   const handleTagAdd = (
@@ -187,6 +188,22 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                 {guestProfiles.map(p => (
                   <span key={p} className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-medium border border-blue-100">
                     {p} <X size={12} className="cursor-pointer hover:text-blue-900" onClick={() => removeTag(p, setGuestProfiles)} />
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Audience (NEWLY ADDED) */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Target Audience</label>
+              <div className="flex gap-2 mb-2">
+                <input type="text" value={audienceInput} onChange={e => setAudienceInput(e.target.value)} onKeyDown={e => handleTagAdd(e, audienceInput, setTargetAudience, setAudienceInput)} className="flex-1 border p-2 rounded-lg text-sm outline-none" placeholder="Add an audience (e.g., Job Seekers, Startups)..." />
+                <button type="button" onClick={e => handleTagAdd(e, audienceInput, setTargetAudience, setAudienceInput)} className="px-3 bg-gray-100 rounded-lg hover:bg-gray-200"><Plus size={16} /></button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {targetAudience.map(a => (
+                  <span key={a} className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-1 rounded-md text-xs font-medium border border-purple-100">
+                    {a} <X size={12} className="cursor-pointer hover:text-purple-900" onClick={() => removeTag(a, setTargetAudience)} />
                   </span>
                 ))}
               </div>
